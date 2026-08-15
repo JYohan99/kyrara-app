@@ -1,3 +1,4 @@
+import { getDisplayStatus } from "@/utils/appointmentStatus";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
@@ -117,20 +118,42 @@ export default function ReservasScreen() {
         data={appointments}
         keyExtractor={(a) => a.id}
         contentContainerStyle={{ padding: Spacing.four, gap: Spacing.two }}
-        renderItem={({ item }) => (
-          <ThemedView style={styles.row}>
-            <ThemedText style={styles.time}>{item.start_time}</ThemedText>
-            <ThemedView style={{ flex: 1 }}>
-              <ThemedText>{item.customer_name}</ThemedText>
-              <ThemedText type="small">
-                {item.service_name} · {item.status}
-              </ThemedText>
+        renderItem={({ item }) => {
+          const displayStatus = getDisplayStatus(
+            item.date,
+            item.start_time,
+            item.end_time,
+            item.status,
+          );
+          const canCancel =
+            item.status === "CONFIRMED" || item.status === "PENDING_APPROVAL";
+
+          return (
+            <ThemedView style={styles.row}>
+              <ThemedText style={styles.time}>{item.start_time}</ThemedText>
+              <ThemedView style={{ flex: 1 }}>
+                <ThemedText>{item.customer_name}</ThemedText>
+                <ThemedText type="small">{item.service_name}</ThemedText>
+              </ThemedView>
+              <ThemedView
+                style={[styles.badge, { backgroundColor: displayStatus.color }]}
+              >
+                <ThemedText style={styles.badgeText}>
+                  {displayStatus.label}
+                </ThemedText>
+              </ThemedView>
+              {canCancel && (
+                <Pressable onPress={() => handleCancel(item)}>
+                  <Ionicons
+                    name="close-circle-outline"
+                    size={22}
+                    color="#DC2626"
+                  />
+                </Pressable>
+              )}
             </ThemedView>
-            <Pressable onPress={() => handleCancel(item)}>
-              <Ionicons name="close-circle-outline" size={22} color="#DC2626" />
-            </Pressable>
-          </ThemedView>
-        )}
+          );
+        }}
         ListEmptyComponent={
           !loading ? (
             <ThemedText style={{ padding: Spacing.four }}>
@@ -181,4 +204,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   fabText: { color: "white", fontSize: 28, lineHeight: 30 },
+  badge: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 11,
+    fontWeight: "600",
+  },
 });

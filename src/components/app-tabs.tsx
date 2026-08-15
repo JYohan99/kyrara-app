@@ -10,6 +10,7 @@ export default function AppTabs() {
 
   return (
     <Tabs
+      initialRouteName="reservas"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.text,
