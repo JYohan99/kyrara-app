@@ -13,6 +13,9 @@ export default function NegocioScreen() {
         <Link href="/negocio/horarios">
           <ThemedText type="link">Horarios →</ThemedText>
         </Link>
+        <Link href="/negocio/configuracion">
+          <ThemedText type="link">Configuración →</ThemedText>
+        </Link>
       </SafeAreaView>
     </ThemedView>
   );
