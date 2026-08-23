@@ -16,6 +16,7 @@ export type Business = {
   booking_mode: "auto" | "approval";
   timezone: string;
   slot_step_minutes: number;
+  logo_base64: string | null;
 };
 
 export type Appointment = {
@@ -93,5 +94,20 @@ export async function updateBusinessSettings(data: {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("No se pudo actualizar la configuración");
+  return res.json();
+}
+
+export async function updateBusiness(data: {
+  name?: string;
+  phone?: string;
+  address?: string;
+  logo_base64?: string;
+}): Promise<Business> {
+  const res = await fetch(`${API_BASE_URL}/appointments/business`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("No se pudo actualizar el negocio");
   return res.json();
 }
