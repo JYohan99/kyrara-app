@@ -1,8 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
+import {
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -15,6 +21,7 @@ import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import {
   CustomerWithHistory,
+  deleteCustomer,
   getCustomer,
   updateCustomer,
 } from "@/features/customers/api";
@@ -65,10 +72,39 @@ export default function CustomerDetailScreen() {
     }
   }
 
+  const router = useRouter();
+
+  function handleDelete() {
+    if (!customer) return;
+    Alert.alert(
+      "Eliminar cliente",
+      `¿Eliminar a ${customer.name || "este cliente"}? Se conserva su historial de reservas.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            await deleteCustomer(id);
+            router.back();
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <ThemedView style={{ flex: 1 }}>
       <Stack.Screen
-        options={{ title: customer?.name || "Cliente", headerShown: true }}
+        options={{
+          title: customer?.name || "Cliente",
+          headerShown: true,
+          headerRight: () => (
+            <Pressable onPress={handleDelete} style={{ marginRight: 8 }}>
+              <Ionicons name="trash-outline" size={22} color="#DC2626" />
+            </Pressable>
+          ),
+        }}
       />
 
       {loading && <ActivityIndicator size="large" style={{ marginTop: 40 }} />}

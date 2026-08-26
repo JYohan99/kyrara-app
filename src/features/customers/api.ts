@@ -60,3 +60,11 @@ export async function updateCustomer(
   if (!res.ok) throw new Error("No se pudo editar el cliente");
   return res.json();
 }
+
+export async function deleteCustomer(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/customers/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok && res.status !== 204)
+    throw new Error("No se pudo eliminar el cliente");
+}
