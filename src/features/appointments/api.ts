@@ -86,7 +86,8 @@ export async function cancelAppointment(id: string): Promise<void> {
 }
 
 export async function updateBusinessSettings(data: {
-  slot_step_minutes: number;
+  slot_step_minutes?: number;
+  booking_mode?: "auto" | "approval";
 }): Promise<Business> {
   const res = await fetch(`${API_BASE_URL}/appointments/business/settings`, {
     method: "PATCH",
@@ -109,5 +110,18 @@ export async function updateBusiness(data: {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("No se pudo actualizar el negocio");
+  return res.json();
+}
+
+export async function respondAppointment(
+  id: string,
+  decision: "accept" | "reject",
+) {
+  const res = await fetch(`${API_BASE_URL}/appointments/${id}/respond`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision }),
+  });
+  if (!res.ok) throw new Error("No se pudo responder la reserva");
   return res.json();
 }

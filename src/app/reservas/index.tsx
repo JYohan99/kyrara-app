@@ -17,6 +17,7 @@ import {
   Appointment,
   cancelAppointment,
   listAppointments,
+  respondAppointment,
 } from "@/features/appointments/api";
 
 function todayStr(): string {
@@ -127,21 +128,51 @@ export default function ReservasScreen() {
           );
           const canCancel =
             item.status === "CONFIRMED" || item.status === "PENDING_APPROVAL";
+          const isPending = item.status === "PENDING_APPROVAL";
+
+          function handleBadgePress() {
+            if (!isPending) return;
+            Alert.alert(
+              "Reserva pendiente",
+              `${item.customer_name || "Cliente"} — ${item.service_name} a las ${item.start_time}`,
+              [
+                { text: "Cerrar", style: "cancel" },
+                {
+                  text: "Rechazar",
+                  style: "destructive",
+                  onPress: async () => {
+                    await respondAppointment(item.id, "reject");
+                    load();
+                  },
+                },
+                {
+                  text: "Aceptar",
+                  onPress: async () => {
+                    await respondAppointment(item.id, "accept");
+                    load();
+                  },
+                },
+              ],
+            );
+          }
 
           return (
             <ThemedView style={styles.row}>
               <ThemedText style={styles.time}>{item.start_time}</ThemedText>
               <ThemedView style={{ flex: 1 }}>
-                <ThemedText>{item.customer_name}</ThemedText>
+                <ThemedText>
+                  {item.customer_name || item.customer_phone || "(sin nombre)"}
+                </ThemedText>
                 <ThemedText type="small">{item.service_name}</ThemedText>
               </ThemedView>
-              <ThemedView
+              <Pressable
+                onPress={handleBadgePress}
                 style={[styles.badge, { backgroundColor: displayStatus.color }]}
               >
                 <ThemedText style={styles.badgeText}>
                   {displayStatus.label}
                 </ThemedText>
-              </ThemedView>
+              </Pressable>
               {canCancel && (
                 <Pressable onPress={() => handleCancel(item)}>
                   <Ionicons

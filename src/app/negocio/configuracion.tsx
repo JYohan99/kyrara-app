@@ -82,6 +82,19 @@ export default function ConfiguracionScreen() {
     }
   }
 
+  async function handleSelectMode(mode: "auto" | "approval") {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await updateBusinessSettings({ booking_mode: mode });
+      setBusiness(updated);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleSelectInterval(minutes: number) {
     setSaving(true);
     setError(null);
@@ -161,6 +174,57 @@ export default function ConfiguracionScreen() {
         <ThemedText type="small" style={{ marginBottom: Spacing.two }}>
           Cada cuánto tiempo el motor de disponibilidad ofrece un horario nuevo.
         </ThemedText>
+
+        <ThemedView>
+          <ThemedText type="code" style={styles.label}>
+            Modo de reserva por WhatsApp
+          </ThemedText>
+          <ThemedText type="small" style={{ marginBottom: Spacing.two }}>
+            Automático: la reserva queda confirmada apenas el cliente la
+            confirma. Con aprobación: vos la aceptás o rechazás después.
+          </ThemedText>
+
+          {business && (
+            <ThemedView style={styles.optionsRow}>
+              <Pressable
+                onPress={() => handleSelectMode("auto")}
+                disabled={saving}
+                style={[
+                  styles.chip,
+                  business.booking_mode === "auto" && styles.chipActive,
+                ]}
+              >
+                <ThemedText
+                  style={
+                    business.booking_mode === "auto"
+                      ? { color: "white" }
+                      : undefined
+                  }
+                >
+                  Automático
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={() => handleSelectMode("approval")}
+                disabled={saving}
+                style={[
+                  styles.chip,
+                  business.booking_mode === "approval" && styles.chipActive,
+                ]}
+              >
+                <ThemedText
+                  style={
+                    business.booking_mode === "approval"
+                      ? { color: "white" }
+                      : undefined
+                  }
+                >
+                  Con aprobación
+                </ThemedText>
+              </Pressable>
+            </ThemedView>
+          )}
+        </ThemedView>
 
         {business && (
           <ThemedView style={styles.optionsRow}>

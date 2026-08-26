@@ -47,3 +47,16 @@ export async function createCustomer(data: {
   if (!res.ok) throw new Error("No se pudo crear el cliente");
   return res.json();
 }
+
+export async function updateCustomer(
+  id: string,
+  data: { name?: string; phone?: string; notes?: string },
+): Promise<Customer> {
+  const res = await fetch(`${API_BASE_URL}/customers/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("No se pudo editar el cliente");
+  return res.json();
+}
