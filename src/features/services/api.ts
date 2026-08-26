@@ -1,12 +1,7 @@
 import { API_BASE_URL } from "@/config/api";
+import { Service } from "./models";
 
-export type Service = {
-  id: string;
-  name: string;
-  duration_minutes: number;
-  price: number | null;
-  active: number;
-};
+export type { Service };
 
 export async function listServices(): Promise<Service[]> {
   const res = await fetch(`${API_BASE_URL}/services`);

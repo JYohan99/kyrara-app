@@ -1,239 +1,521 @@
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { Stack, useRouter } from "expo-router";
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
 import {
-    createAppointment,
-    getAvailableSlots,
-} from "@/features/appointments/api";
-import { Customer, listCustomers } from "@/features/customers/api";
-import { Service, listServices } from "@/features/services/api";
+  BorderRadius,
+  MaxContentWidth,
+  Palette,
+  Spacing,
+} from "@/constants/theme";
+import { useNuevaReservaViewModel } from "@/features/appointments";
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
+function getInitials(name?: string | null, phone?: string): string {
+  if (name && name.trim()) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  if (phone) return phone.slice(-2);
+  return "?";
 }
 
 export default function NuevaReservaScreen() {
   const router = useRouter();
-
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null,
-  );
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [date, setDate] = useState(today());
-  const [slots, setSlots] = useState<string[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-
-  const [loadingSlots, setLoadingSlots] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listCustomers()
-      .then(setCustomers)
-      .catch((e) => setError(e.message));
-    listServices()
-      .then(setServices)
-      .catch((e) => setError(e.message));
-  }, []);
-
-  // Cada vez que cambia el servicio o la fecha, volvemos a pedir los
-  // horarios disponibles reales al motor de disponibilidad del backend.
-  useEffect(() => {
-    if (!selectedService || !date) {
-      setSlots([]);
-      return;
-    }
-    setLoadingSlots(true);
-    setSelectedSlot(null);
-    getAvailableSlots(date, selectedService.id)
-      .then((res) => setSlots(res.slots))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoadingSlots(false));
-  }, [selectedService, date]);
-
-  async function handleConfirm() {
-    if (!selectedCustomer || !selectedService || !selectedSlot) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await createAppointment({
-        customer_id: selectedCustomer.id,
-        service_id: selectedService.id,
-        date,
-        start_time: selectedSlot,
-      });
-      router.back();
-    } catch (e: any) {
-      setError(e.message);
-      // El horario que elegiste puede haber sido tomado por otra reserva
-      // justo antes (Regla 004) — volvemos a pedir la lista actualizada.
-      if (selectedService) {
-        getAvailableSlots(date, selectedService.id).then((res) =>
-          setSlots(res.slots),
-        );
-      }
-    } finally {
-      setSaving(false);
-    }
-  }
+  const {
+    customers,
+    services,
+    selectedCustomer,
+    selectedService,
+    date,
+    slots,
+    selectedSlot,
+    loadingSlots,
+    saving,
+    error,
+    isConfirmDisabled,
+    handleSelectCustomer,
+    handleSelectService,
+    handleDateChange,
+    handleSelectSlot,
+    handleConfirm,
+  } = useNuevaReservaViewModel();
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{ padding: Spacing.four, gap: Spacing.three }}
-    >
-      <ThemedText type="code" style={styles.label}>
-        Cliente
-      </ThemedText>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {customers.map((c) => (
-          <Pressable
-            key={c.id}
-            onPress={() => setSelectedCustomer(c)}
-            style={[
-              styles.chip,
-              selectedCustomer?.id === c.id && styles.chipActive,
-            ]}
-          >
-            <ThemedText
-              style={
-                selectedCustomer?.id === c.id ? { color: "white" } : undefined
-              }
-            >
-              {c.name || c.phone}
-            </ThemedText>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <ThemedText type="code" style={styles.label}>
-        Servicio
-      </ThemedText>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {services
-          .filter((s) => s.active)
-          .map((s) => (
-            <Pressable
-              key={s.id}
-              onPress={() => setSelectedService(s)}
-              style={[
-                styles.chip,
-                selectedService?.id === s.id && styles.chipActive,
-              ]}
-            >
-              <ThemedText
-                style={
-                  selectedService?.id === s.id ? { color: "white" } : undefined
-                }
-              >
-                {s.name} ({s.duration_minutes}min)
-              </ThemedText>
-            </Pressable>
-          ))}
-      </ScrollView>
-
-      <ThemedText type="code" style={styles.label}>
-        Fecha
-      </ThemedText>
-      <TextInput
-        value={date}
-        onChangeText={setDate}
-        placeholder="YYYY-MM-DD"
-        style={styles.input}
+    <ThemedView style={styles.container}>
+      <Stack.Screen
+        options={{
+          title: "Nueva Reserva",
+          headerShown: true,
+          headerStyle: { backgroundColor: Palette.background },
+          headerTintColor: Palette.textPrimary,
+          headerShadowVisible: false,
+        }}
       />
 
-      <ThemedText type="code" style={styles.label}>
-        Horario disponible
-      </ThemedText>
-      {loadingSlots && <ActivityIndicator />}
-      {!loadingSlots && selectedService && slots.length === 0 && (
-        <ThemedText type="small">
-          No hay horarios disponibles ese día.
-        </ThemedText>
-      )}
-      <ThemedView style={styles.slotsWrap}>
-        {slots.map((slot) => (
-          <Pressable
-            key={slot}
-            onPress={() => setSelectedSlot(slot)}
-            style={[
-              styles.slotChip,
-              selectedSlot === slot && styles.chipActive,
-            ]}
-          >
-            <ThemedText
-              style={selectedSlot === slot ? { color: "white" } : undefined}
+      <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* SECCIÓN 1: CLIENTE */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="person-outline" size={16} color={Palette.primaryLight} />
+              <ThemedText style={styles.sectionLabel}>1. Seleccionar Cliente</ThemedText>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalChipsWrap}
             >
-              {slot}
-            </ThemedText>
+              {customers.map((c) => {
+                const isSelected = selectedCustomer?.id === c.id;
+                return (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => handleSelectCustomer(c)}
+                    style={({ pressed }) => [
+                      styles.customerCard,
+                      isSelected && styles.customerCardSelected,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.avatarCircle,
+                        isSelected && styles.avatarCircleSelected,
+                      ]}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.avatarText,
+                          isSelected && styles.avatarTextSelected,
+                        ]}
+                      >
+                        {getInitials(c.name, c.phone)}
+                      </ThemedText>
+                    </View>
+                    <ThemedText
+                      style={[
+                        styles.chipText,
+                        isSelected && styles.chipTextSelected,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {c.name || c.phone}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* SECCIÓN 2: SERVICIO */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="cut-outline" size={16} color={Palette.secondary} />
+              <ThemedText style={styles.sectionLabel}>2. Seleccionar Servicio</ThemedText>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalChipsWrap}
+            >
+              {services
+                .filter((s) => s.active)
+                .map((s) => {
+                  const isSelected = selectedService?.id === s.id;
+                  return (
+                    <Pressable
+                      key={s.id}
+                      onPress={() => handleSelectService(s)}
+                      style={({ pressed }) => [
+                        styles.serviceCard,
+                        isSelected && styles.serviceCardSelected,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.serviceTitle,
+                          isSelected && styles.serviceTitleSelected,
+                        ]}
+                      >
+                        {s.name}
+                      </ThemedText>
+                      <View style={styles.serviceMetaRow}>
+                        <ThemedText style={styles.serviceDuration}>
+                          {s.duration_minutes} min
+                        </ThemedText>
+                        {s.price !== null && (
+                          <View style={styles.priceBadge}>
+                            <ThemedText style={styles.priceBadgeText}>
+                              ${s.price}
+                            </ThemedText>
+                          </View>
+                        )}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+            </ScrollView>
+          </View>
+
+          {/* SECCIÓN 3: FECHA */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="calendar-outline" size={16} color={Palette.primaryLight} />
+              <ThemedText style={styles.sectionLabel}>3. Fecha de Reserva</ThemedText>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Ionicons name="today-outline" size={18} color={Palette.textMuted} />
+              <TextInput
+                value={date}
+                onChangeText={handleDateChange}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={Palette.textMuted}
+                style={styles.textInput}
+              />
+            </View>
+          </View>
+
+          {/* SECCIÓN 4: HORARIOS DISPONIBLES */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="time-outline" size={16} color={Palette.secondary} />
+              <ThemedText style={styles.sectionLabel}>4. Horario Disponible</ThemedText>
+            </View>
+
+            {loadingSlots && (
+              <View style={styles.slotsLoadingWrap}>
+                <ActivityIndicator size="small" color={Palette.secondary} />
+                <ThemedText style={styles.slotsLoadingText}>
+                  Consultando disponibilidad en tiempo real...
+                </ThemedText>
+              </View>
+            )}
+
+            {!loadingSlots && selectedService && slots.length === 0 && (
+              <View style={styles.noSlotsCard}>
+                <Ionicons name="information-circle-outline" size={20} color={Palette.warning} />
+                <ThemedText style={styles.noSlotsText}>
+                  No hay horarios disponibles para la fecha seleccionada.
+                </ThemedText>
+              </View>
+            )}
+
+            <View style={styles.slotsGrid}>
+              {slots.map((slot) => {
+                const isSelected = selectedSlot === slot;
+                return (
+                  <Pressable
+                    key={slot}
+                    onPress={() => handleSelectSlot(slot)}
+                    style={({ pressed }) => [
+                      styles.slotChip,
+                      isSelected && styles.slotChipSelected,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.slotText,
+                        isSelected && styles.slotTextSelected,
+                      ]}
+                    >
+                      {slot}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* MENSAJE DE ERROR */}
+          {error && (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle-outline" size={20} color={Palette.error} />
+              <ThemedText style={styles.errorText}>{error}</ThemedText>
+            </View>
+          )}
+
+          {/* BOTÓN CONFIRMAR */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.confirmButton,
+              isConfirmDisabled && styles.confirmButtonDisabled,
+              pressed && !isConfirmDisabled && styles.pressed,
+            ]}
+            disabled={isConfirmDisabled}
+            onPress={handleConfirm}
+          >
+            {saving ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <View style={styles.confirmButtonContent}>
+                <ThemedText style={styles.confirmButtonText}>
+                  Confirmar Reserva
+                </ThemedText>
+                <Ionicons name="arrow-forward" size={18} color="#ffffff" />
+              </View>
+            )}
           </Pressable>
-        ))}
-      </ThemedView>
-
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
-
-      <Pressable
-        style={[
-          styles.confirmButton,
-          (!selectedCustomer || !selectedService || !selectedSlot) && {
-            opacity: 0.4,
-          },
-        ]}
-        disabled={
-          !selectedCustomer || !selectedService || !selectedSlot || saving
-        }
-        onPress={handleConfirm}
-      >
-        <ThemedText style={{ color: "white" }}>
-          {saving ? "Guardando..." : "Confirmar reserva"}
-        </ThemedText>
-      </Pressable>
-    </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  label: { textTransform: "uppercase", marginTop: Spacing.two },
-  chip: {
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderRadius: 20,
-    backgroundColor: "#00000011",
-    marginRight: Spacing.two,
+  container: {
+    flex: 1,
+    backgroundColor: Palette.background,
   },
-  chipActive: { backgroundColor: "#2563EB" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#00000022",
-    borderRadius: Spacing.two,
-    padding: Spacing.three,
+  safeArea: {
+    flex: 1,
+    maxWidth: MaxContentWidth,
+    width: "100%",
+    alignSelf: "center",
   },
-  slotsWrap: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.two },
-  slotChip: {
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.two,
-    backgroundColor: "#00000011",
+  scrollContent: {
+    padding: Spacing.four,
+    gap: Spacing.four,
+    paddingBottom: 40,
   },
-  error: { color: "red", textAlign: "center" },
-  confirmButton: {
-    backgroundColor: "#2563EB",
-    padding: Spacing.three,
-    borderRadius: Spacing.two,
+  section: {
+    gap: Spacing.two,
+  },
+  sectionHeader: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Palette.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  horizontalChipsWrap: {
+    gap: Spacing.two,
+    paddingVertical: 4,
+  },
+  customerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: BorderRadius.pill,
+    backgroundColor: Palette.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    gap: 8,
+  },
+  customerCardSelected: {
+    backgroundColor: Palette.primary,
+    borderColor: Palette.primary,
+  },
+  avatarCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Palette.surfaceContainerHigh,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarCircleSelected: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+  },
+  avatarText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: Palette.textPrimary,
+  },
+  avatarTextSelected: {
+    color: "#ffffff",
+  },
+  chipText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: Palette.textPrimary,
+  },
+  chipTextSelected: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+  serviceCard: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: BorderRadius.card,
+    backgroundColor: Palette.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    minWidth: 140,
+    gap: 6,
+  },
+  serviceCardSelected: {
+    backgroundColor: Palette.surfaceContainerHigh,
+    borderColor: Palette.secondary,
+  },
+  serviceTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Palette.textPrimary,
+  },
+  serviceTitleSelected: {
+    color: Palette.secondary,
+  },
+  serviceMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  serviceDuration: {
+    fontSize: 12,
+    color: Palette.textMuted,
+  },
+  priceBadge: {
+    backgroundColor: Palette.surfaceContainerLowest,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: BorderRadius.pill,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+  },
+  priceBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Palette.secondary,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Palette.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.three,
+    height: 48,
+    gap: Spacing.two,
+  },
+  textInput: {
+    flex: 1,
+    color: Palette.textPrimary,
+    fontSize: 15,
+  },
+  slotsLoadingWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+  },
+  slotsLoadingText: {
+    fontSize: 13,
+    color: Palette.textMuted,
+  },
+  noSlotsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Palette.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    padding: Spacing.three,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.two,
+  },
+  noSlotsText: {
+    fontSize: 13,
+    color: Palette.textSecondary,
+    flex: 1,
+  },
+  slotsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.two,
+  },
+  slotChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Palette.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    minWidth: 72,
+    alignItems: "center",
+  },
+  slotChipSelected: {
+    backgroundColor: Palette.primary,
+    borderColor: Palette.primary,
+  },
+  slotText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Palette.textPrimary,
+  },
+  slotTextSelected: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Palette.errorContainer,
+    padding: Spacing.three,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.two,
+  },
+  errorText: {
+    color: Palette.error,
+    fontSize: 13,
+    flex: 1,
+  },
+  confirmButton: {
+    backgroundColor: Palette.primary,
+    height: 52,
+    borderRadius: BorderRadius.xl,
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: Spacing.two,
-    marginBottom: Spacing.six ?? 60,
+    shadowColor: Palette.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  confirmButtonDisabled: {
+    opacity: 0.35,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  confirmButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  confirmButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  pressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.98 }],
   },
 });

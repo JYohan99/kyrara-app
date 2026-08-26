@@ -1,246 +1,445 @@
-import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { Stack } from "expo-router";
 import {
-    ActivityIndicator,
-    FlatList,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Switch,
-    TextInput,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Switch,
+  TextInput,
+  View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
 import {
-    Service,
-    createService,
-    listServices,
-    toggleServiceActive,
-    updateService,
-} from "@/features/services/api";
+  BorderRadius,
+  MaxContentWidth,
+  Palette,
+  Spacing,
+} from "@/constants/theme";
+import { useServiciosViewModel } from "@/features/services";
 
 export default function ServiciosScreen() {
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editing, setEditing] = useState<Service | null>(null);
-  const [name, setName] = useState("");
-  const [duration, setDuration] = useState("");
-  const [price, setPrice] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    listServices()
-      .then(setServices)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Recarga cada vez que la pantalla vuelve a estar en foco (ej. al volver
-  // de crear un servicio), no solo la primera vez que se monta.
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
-
-  function openCreate() {
-    setEditing(null);
-    setName("");
-    setDuration("");
-    setPrice("");
-    setModalVisible(true);
-  }
-
-  function openEdit(service: Service) {
-    setEditing(service);
-    setName(service.name);
-    setDuration(String(service.duration_minutes));
-    setPrice(service.price ? String(service.price) : "");
-    setModalVisible(true);
-  }
-
-  async function handleSave() {
-    if (!name.trim() || !duration.trim()) return;
-    setSaving(true);
-    try {
-      const payload = {
-        name: name.trim(),
-        duration_minutes: Number(duration),
-        price: price.trim() ? Number(price) : undefined,
-      };
-      if (editing) {
-        await updateService(editing.id, payload);
-      } else {
-        await createService(payload);
-      }
-      setModalVisible(false);
-      load();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleToggle(service: Service) {
-    try {
-      await toggleServiceActive(service.id);
-      load();
-    } catch (e: any) {
-      setError(e.message);
-    }
-  }
+  const {
+    services,
+    loading,
+    error,
+    modalVisible,
+    editing,
+    name,
+    duration,
+    price,
+    saving,
+    setName,
+    setDuration,
+    setPrice,
+    openCreate,
+    openEdit,
+    closeModal,
+    handleSave,
+    handleToggle,
+  } = useServiciosViewModel();
 
   return (
     <ThemedView style={styles.container}>
-      {loading && <ActivityIndicator size="large" style={{ marginTop: 40 }} />}
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
-
-      <FlatList
-        data={services}
-        keyExtractor={(s) => s.id}
-        contentContainerStyle={{ padding: Spacing.four, gap: Spacing.two }}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => openEdit(item)} style={styles.row}>
-            <ThemedView style={{ flex: 1 }}>
-              <ThemedText
-                style={!item.active ? styles.inactiveText : undefined}
-              >
-                {item.name}
-              </ThemedText>
-              <ThemedText type="small">
-                {item.duration_minutes} min
-                {item.price ? ` · $${item.price}` : ""}
-              </ThemedText>
-            </ThemedView>
-            <Switch
-              value={!!item.active}
-              onValueChange={() => handleToggle(item)}
-            />
-          </Pressable>
-        )}
-        ListEmptyComponent={
-          !loading ? (
-            <ThemedText style={{ padding: Spacing.four }}>
-              Sin servicios todavía.
-            </ThemedText>
-          ) : null
-        }
+      <Stack.Screen
+        options={{
+          title: "Servicios",
+          headerShown: true,
+          headerStyle: { backgroundColor: Palette.background },
+          headerTintColor: Palette.textPrimary,
+          headerShadowVisible: false,
+        }}
       />
 
-      <Pressable style={styles.fab} onPress={openCreate}>
-        <ThemedText style={styles.fabText}>+</ThemedText>
-      </Pressable>
+      <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Palette.secondary} />
+          </View>
+        )}
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <ThemedView style={styles.modalOverlay}>
-          <ThemedView style={styles.modalCard}>
-            <ThemedText type="title">
-              {editing ? "Editar servicio" : "Nuevo servicio"}
-            </ThemedText>
+        {error && (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle-outline" size={20} color={Palette.error} />
+            <ThemedText style={styles.errorText}>{error}</ThemedText>
+          </View>
+        )}
 
-            <TextInput
-              placeholder="Nombre (ej. Corte clásico)"
-              value={name}
-              onChangeText={setName}
-              style={styles.input}
-            />
-            <TextInput
-              placeholder="Duración en minutos"
-              value={duration}
-              onChangeText={setDuration}
-              keyboardType="numeric"
-              style={styles.input}
-            />
-            <TextInput
-              placeholder="Precio (opcional)"
-              value={price}
-              onChangeText={setPrice}
-              keyboardType="numeric"
-              style={styles.input}
-            />
-
-            <ThemedView style={styles.modalActions}>
-              <Pressable
-                onPress={() => setModalVisible(false)}
-                style={styles.modalButton}
-              >
-                <ThemedText>Cancelar</ThemedText>
-              </Pressable>
-              <Pressable
-                onPress={handleSave}
-                style={[styles.modalButton, styles.saveButton]}
-                disabled={saving}
-              >
-                <ThemedText style={{ color: "white" }}>
-                  {saving ? "Guardando..." : "Guardar"}
+        <FlatList
+          data={services}
+          keyExtractor={(s) => s.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <Pressable
+              onPress={() => openEdit(item)}
+              style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+            >
+              <View style={styles.infoColumn}>
+                <ThemedText
+                  style={[
+                    styles.serviceName,
+                    !item.active && styles.inactiveText,
+                  ]}
+                >
+                  {item.name}
                 </ThemedText>
-              </Pressable>
-            </ThemedView>
-          </ThemedView>
-        </ThemedView>
-      </Modal>
+
+                <View style={styles.metaRow}>
+                  <View style={styles.durationWrap}>
+                    <Ionicons name="time-outline" size={13} color={Palette.textMuted} />
+                    <ThemedText style={styles.durationText}>
+                      {item.duration_minutes} min
+                    </ThemedText>
+                  </View>
+
+                  {item.price !== null && (
+                    <View style={styles.priceBadge}>
+                      <ThemedText style={styles.priceBadgeText}>
+                        ${item.price}
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              <Switch
+                value={!!item.active}
+                onValueChange={() => handleToggle(item)}
+                trackColor={{
+                  false: Palette.surfaceContainerHighest,
+                  true: Palette.primary,
+                }}
+                thumbColor="#ffffff"
+              />
+            </Pressable>
+          )}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconWrap}>
+                  <Ionicons
+                    name="cut-outline"
+                    size={36}
+                    color={Palette.textMuted}
+                  />
+                </View>
+                <ThemedText style={styles.emptyTitle}>
+                  Sin servicios todavía
+                </ThemedText>
+                <ThemedText style={styles.emptySubtitle}>
+                  Agrega servicios que tus clientes puedan reservar tocando el botón +.
+                </ThemedText>
+              </View>
+            ) : null
+          }
+        />
+
+        {/* FAB para nuevo servicio */}
+        <Pressable
+          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+          onPress={openCreate}
+        >
+          <Ionicons name="add" size={28} color="#ffffff" />
+        </Pressable>
+
+        {/* MODAL CREAR / EDITAR SERVICIO */}
+        <Modal visible={modalVisible} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <ThemedText style={styles.modalTitle}>
+                  {editing ? "Editar Servicio" : "Nuevo Servicio"}
+                </ThemedText>
+                <Pressable onPress={closeModal} hitSlop={8}>
+                  <Ionicons name="close" size={24} color={Palette.textMuted} />
+                </Pressable>
+              </View>
+
+              <View style={styles.formGroup}>
+                <View style={styles.modalInputWrap}>
+                  <Ionicons name="cut-outline" size={18} color={Palette.textMuted} />
+                  <TextInput
+                    placeholder="Nombre del servicio (ej. Corte Clásico)"
+                    placeholderTextColor={Palette.textMuted}
+                    value={name}
+                    onChangeText={setName}
+                    style={styles.modalInput}
+                  />
+                </View>
+
+                <View style={styles.modalInputWrap}>
+                  <Ionicons name="time-outline" size={18} color={Palette.textMuted} />
+                  <TextInput
+                    placeholder="Duración en minutos (ej. 30)"
+                    placeholderTextColor={Palette.textMuted}
+                    value={duration}
+                    onChangeText={setDuration}
+                    keyboardType="numeric"
+                    style={styles.modalInput}
+                  />
+                </View>
+
+                <View style={styles.modalInputWrap}>
+                  <Ionicons name="cash-outline" size={18} color={Palette.textMuted} />
+                  <TextInput
+                    placeholder="Precio en $ (opcional)"
+                    placeholderTextColor={Palette.textMuted}
+                    value={price}
+                    onChangeText={setPrice}
+                    keyboardType="numeric"
+                    style={styles.modalInput}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalActions}>
+                <Pressable
+                  onPress={closeModal}
+                  style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+                >
+                  <ThemedText style={styles.cancelBtnText}>Cancelar</ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={handleSave}
+                  style={({ pressed }) => [
+                    styles.saveBtn,
+                    saving && styles.btnDisabled,
+                    pressed && styles.pressed,
+                  ]}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <ThemedText style={styles.saveBtnText}>
+                      {editing ? "Guardar Cambios" : "Crear Servicio"}
+                    </ThemedText>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  row: {
+  container: {
+    flex: 1,
+    backgroundColor: Palette.background,
+  },
+  safeArea: {
+    flex: 1,
+    maxWidth: MaxContentWidth,
+    width: "100%",
+    alignSelf: "center",
+  },
+  loadingContainer: {
+    paddingVertical: Spacing.six,
+    alignItems: "center",
+  },
+  errorBanner: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.two,
-    backgroundColor: "#00000008",
+    backgroundColor: Palette.errorContainer,
+    padding: Spacing.three,
+    marginHorizontal: Spacing.four,
+    marginVertical: Spacing.two,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.two,
   },
-  inactiveText: { opacity: 0.4, textDecorationLine: "line-through" },
-  error: { color: "red", textAlign: "center", padding: Spacing.three },
+  errorText: {
+    color: Palette.error,
+    fontSize: 13,
+    flex: 1,
+  },
+  listContent: {
+    padding: Spacing.four,
+    paddingBottom: 100,
+    gap: Spacing.two,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Palette.surfaceContainer,
+    borderRadius: BorderRadius.card,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.four,
+  },
+  infoColumn: {
+    flex: 1,
+    gap: 6,
+    paddingRight: Spacing.two,
+  },
+  serviceName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Palette.textPrimary,
+  },
+  inactiveText: {
+    opacity: 0.45,
+    textDecorationLine: "line-through",
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  durationWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  durationText: {
+    fontSize: 13,
+    color: Palette.textMuted,
+  },
+  priceBadge: {
+    backgroundColor: Palette.secondaryDark,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: BorderRadius.pill,
+  },
+  priceBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Palette.secondary,
+  },
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.six,
+    gap: Spacing.two,
+  },
+  emptyIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Palette.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.two,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Palette.textPrimary,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: Palette.textMuted,
+    textAlign: "center",
+    maxWidth: 240,
+  },
   fab: {
     position: "absolute",
     right: 20,
-    bottom: 30,
+    bottom: 24,
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#2563EB",
+    backgroundColor: Palette.primary,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: Palette.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  fabText: { color: "white", fontSize: 28, lineHeight: 30 },
+  fabPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.96 }],
+  },
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "#00000055",
+    backgroundColor: "#00000088",
   },
   modalCard: {
+    backgroundColor: Palette.surfaceContainer,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
     padding: Spacing.four,
-    borderTopLeftRadius: Spacing.four,
-    borderTopRightRadius: Spacing.four,
     gap: Spacing.three,
   },
-  input: {
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingBottom: Spacing.one,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Palette.textPrimary,
+  },
+  formGroup: {
+    gap: Spacing.two,
+  },
+  modalInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Palette.surfaceContainerLow,
     borderWidth: 1,
-    borderColor: "#00000022",
-    borderRadius: Spacing.two,
-    padding: Spacing.three,
+    borderColor: Palette.border,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.three,
+    height: 48,
+    gap: Spacing.two,
+  },
+  modalInput: {
+    flex: 1,
+    color: Palette.textPrimary,
+    fontSize: 15,
   },
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: Spacing.two,
     marginTop: Spacing.two,
+    paddingBottom: Spacing.two,
   },
-  modalButton: {
-    paddingVertical: Spacing.two,
+  cancelBtn: {
+    paddingVertical: 12,
     paddingHorizontal: Spacing.four,
-    borderRadius: Spacing.two,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Palette.surfaceContainerHigh,
   },
-  saveButton: { backgroundColor: "#2563EB" },
+  cancelBtnText: {
+    color: Palette.textPrimary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  saveBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.four,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Palette.primary,
+  },
+  saveBtnText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  pressed: {
+    opacity: 0.75,
+  },
 });

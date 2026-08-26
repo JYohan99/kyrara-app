@@ -1,20 +1,29 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useColorScheme } from "react-native";
+import { Platform } from "react-native";
 
-import { Colors } from "@/constants/theme";
+import { Palette } from "@/constants/theme";
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === "unspecified" || !scheme ? "light" : scheme];
-
   return (
     <Tabs
-      initialRouteName="reservas"
+      initialRouteName="index"
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.text,
-        tabBarStyle: { backgroundColor: colors.background },
+        tabBarActiveTintColor: Palette.secondary,
+        tabBarInactiveTintColor: Palette.textMuted,
+        tabBarStyle: {
+          backgroundColor: Palette.background,
+          borderTopColor: Palette.borderSubtle,
+          borderTopWidth: 1,
+          height: Platform.OS === "ios" ? 84 : 64,
+          paddingBottom: Platform.OS === "ios" ? 24 : 10,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "600",
+        },
       }}
     >
       <Tabs.Screen

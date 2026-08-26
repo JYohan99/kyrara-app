@@ -1,248 +1,424 @@
-import { getDisplayStatus } from "@/utils/appointmentStatus";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
+  View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
-import {
-  Appointment,
-  cancelAppointment,
-  listAppointments,
-  respondAppointment,
-} from "@/features/appointments/api";
-
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-function addDays(dateStr: string, days: number): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-function formatLabel(dateStr: string): string {
-  if (dateStr === todayStr()) return "Hoy";
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return date.toLocaleDateString("es-UY", {
-    weekday: "long",
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-}
+import { BorderRadius, MaxContentWidth, Palette, Spacing } from "@/constants/theme";
+import { useReservasViewModel } from "@/features/appointments";
 
 export default function ReservasScreen() {
-  const router = useRouter();
-  const [date, setDate] = useState(todayStr());
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    listAppointments(date)
-      .then(setAppointments)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [date]);
-
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
-
-  function handleCancel(a: Appointment) {
-    Alert.alert(
-      "Cancelar reserva",
-      `¿Cancelar la reserva de ${a.customer_name}?`,
-      [
-        { text: "No", style: "cancel" },
-        {
-          text: "Sí, cancelar",
-          style: "destructive",
-          onPress: async () => {
-            await cancelAppointment(a.id);
-            load();
-          },
-        },
-      ],
-    );
-  }
+  const {
+    isToday,
+    dateFormattedLabel,
+    appointments,
+    loading,
+    error,
+    goToPreviousDay,
+    goToNextDay,
+    goToToday,
+    handleCancelAppointment,
+    handleBadgePress,
+    getDisplayStatus,
+    navigateToNuevaReserva,
+  } = useReservasViewModel();
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <ThemedView style={styles.header}>
-        <Pressable onPress={() => setDate((d) => addDays(d, -1))}>
-          <Ionicons name="chevron-back" size={26} />
-        </Pressable>
-
-        <Pressable
-          onPress={() => setDate(todayStr())}
-          style={{ alignItems: "center" }}
-        >
-          <ThemedText
-            style={{
-              textTransform: "capitalize",
-              fontWeight: "700",
-              fontSize: date === todayStr() ? 23 : 17,
-            }}
+    <ThemedView style={styles.container}>
+      <SafeAreaView edges={["top"]} style={styles.safeArea}>
+        {/* Header con selector de fecha */}
+        <View style={styles.header}>
+          <Pressable
+            onPress={goToPreviousDay}
+            style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
+            hitSlop={8}
           >
-            {formatLabel(date)}
-          </ThemedText>
-          {date !== todayStr() && (
-            <ThemedText type="small" style={{ color: "#2563EB" }}>
-              volver a hoy
+            <Ionicons name="chevron-back" size={20} color={Palette.textPrimary} />
+          </Pressable>
+
+          <Pressable
+            onPress={goToToday}
+            style={({ pressed }) => [styles.dateContainer, pressed && styles.pressed]}
+          >
+            <View style={styles.dateBadgeRow}>
+              {isToday && <View style={styles.todayIndicator} />}
+              <ThemedText style={[styles.dateTitle, isToday && styles.dateTitleToday]}>
+                {dateFormattedLabel}
+              </ThemedText>
+            </View>
+            {!isToday && (
+              <ThemedText style={styles.todaySublink}>
+                volver a hoy
+              </ThemedText>
+            )}
+          </Pressable>
+
+          <Pressable
+            onPress={goToNextDay}
+            style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-forward" size={20} color={Palette.textPrimary} />
+          </Pressable>
+        </View>
+
+        {/* Resumen de cantidad */}
+        {!loading && (
+          <View style={styles.summaryRow}>
+            <ThemedText style={styles.summaryText}>
+              {appointments.length === 1
+                ? "1 reserva programada"
+                : `${appointments.length} reservas programadas`}
             </ThemedText>
-          )}
-        </Pressable>
+          </View>
+        )}
 
-        <Pressable onPress={() => setDate((d) => addDays(d, 1))}>
-          <Ionicons name="chevron-forward" size={26} />
-        </Pressable>
-      </ThemedView>
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Palette.secondary} />
+          </View>
+        )}
 
-      {loading && <ActivityIndicator size="large" style={{ marginTop: 20 }} />}
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+        {error && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={20} color={Palette.error} />
+            <ThemedText style={styles.errorText}>{error}</ThemedText>
+          </View>
+        )}
 
-      <FlatList
-        data={appointments}
-        keyExtractor={(a) => a.id}
-        contentContainerStyle={{ padding: Spacing.four, gap: Spacing.two }}
-        renderItem={({ item }) => {
-          const displayStatus = getDisplayStatus(
-            item.date,
-            item.start_time,
-            item.end_time,
-            item.status,
-          );
-          const canCancel =
-            item.status === "CONFIRMED" || item.status === "PENDING_APPROVAL";
-          const isPending = item.status === "PENDING_APPROVAL";
-
-          function handleBadgePress() {
-            if (!isPending) return;
-            Alert.alert(
-              "Reserva pendiente",
-              `${item.customer_name || "Cliente"} — ${item.service_name} a las ${item.start_time}`,
-              [
-                { text: "Cerrar", style: "cancel" },
-                {
-                  text: "Rechazar",
-                  style: "destructive",
-                  onPress: async () => {
-                    await respondAppointment(item.id, "reject");
-                    load();
-                  },
-                },
-                {
-                  text: "Aceptar",
-                  onPress: async () => {
-                    await respondAppointment(item.id, "accept");
-                    load();
-                  },
-                },
-              ],
+        {/* Lista de citas */}
+        <FlatList
+          data={appointments}
+          keyExtractor={(a) => a.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => {
+            const displayStatus = getDisplayStatus(
+              item.date,
+              item.start_time,
+              item.end_time,
+              item.status,
             );
-          }
+            const canCancel =
+              item.status === "CONFIRMED" || item.status === "PENDING_APPROVAL";
+            const isPending = item.status === "PENDING_APPROVAL";
 
-          return (
-            <ThemedView style={styles.row}>
-              <ThemedText style={styles.time}>{item.start_time}</ThemedText>
-              <ThemedView style={{ flex: 1 }}>
-                <ThemedText>
-                  {item.customer_name || item.customer_phone || "(sin nombre)"}
-                </ThemedText>
-                <ThemedText type="small">{item.service_name}</ThemedText>
-              </ThemedView>
-              <Pressable
-                onPress={handleBadgePress}
-                style={[styles.badge, { backgroundColor: displayStatus.color }]}
-              >
-                <ThemedText style={styles.badgeText}>
-                  {displayStatus.label}
-                </ThemedText>
-              </Pressable>
-              {canCancel && (
-                <Pressable onPress={() => handleCancel(item)}>
+            return (
+              <View style={styles.card}>
+                {/* Indicador de hora */}
+                <View style={styles.timeColumn}>
+                  <ThemedText style={styles.timeText}>{item.start_time}</ThemedText>
+                  <ThemedText style={styles.endTimeText}>
+                    {item.end_time ? `– ${item.end_time}` : ""}
+                  </ThemedText>
+                </View>
+
+                {/* Línea divisoria vertical sutil */}
+                <View style={styles.verticalDivider} />
+
+                {/* Datos del cliente y servicio */}
+                <View style={styles.infoColumn}>
+                  <ThemedText style={styles.customerName} numberOfLines={1}>
+                    {item.customer_name || item.customer_phone || "(sin nombre)"}
+                  </ThemedText>
+                  <View style={styles.serviceRow}>
+                    <Ionicons name="cut-outline" size={13} color={Palette.textMuted} />
+                    <ThemedText style={styles.serviceName} numberOfLines={1}>
+                      {item.service_name}
+                    </ThemedText>
+                  </View>
+                </View>
+
+                {/* Badges de estado y acciones */}
+                <View style={styles.actionsColumn}>
+                  <Pressable
+                    onPress={() => handleBadgePress(item)}
+                    disabled={!isPending}
+                    style={({ pressed }) => [
+                      styles.badge,
+                      { backgroundColor: displayStatus.color },
+                      isPending && pressed && styles.pressed,
+                    ]}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.badgeText,
+                        { color: displayStatus.textColor ?? Palette.textPrimary },
+                      ]}
+                    >
+                      {displayStatus.label}
+                    </ThemedText>
+                  </Pressable>
+
+                  {canCancel && (
+                    <Pressable
+                      onPress={() => handleCancelAppointment(item)}
+                      style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}
+                      hitSlop={6}
+                    >
+                      <Ionicons
+                        name="close-circle-outline"
+                        size={20}
+                        color={Palette.error}
+                      />
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+            );
+          }}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconWrap}>
                   <Ionicons
-                    name="close-circle-outline"
-                    size={22}
-                    color="#DC2626"
+                    name="calendar-clear-outline"
+                    size={36}
+                    color={Palette.textMuted}
                   />
-                </Pressable>
-              )}
-            </ThemedView>
-          );
-        }}
-        ListEmptyComponent={
-          !loading ? (
-            <ThemedText style={{ padding: Spacing.four }}>
-              Sin reservas ese día.
-            </ThemedText>
-          ) : null
-        }
-      />
+                </View>
+                <ThemedText style={styles.emptyTitle}>
+                  Sin reservas ese día
+                </ThemedText>
+                <ThemedText style={styles.emptySubtitle}>
+                  Toca el botón + para registrar una reserva manual.
+                </ThemedText>
+              </View>
+            ) : null
+          }
+        />
 
-      <Pressable
-        style={styles.fab}
-        onPress={() => router.push("/reservas/nueva")}
-      >
-        <ThemedText style={styles.fabText}>+</ThemedText>
-      </Pressable>
+        {/* FAB Botón de Nueva Reserva */}
+        <Pressable
+          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+          onPress={navigateToNuevaReserva}
+        >
+          <Ionicons name="add" size={28} color="#ffffff" />
+        </Pressable>
+      </SafeAreaView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Palette.background,
+  },
+  safeArea: {
+    flex: 1,
+    maxWidth: MaxContentWidth,
+    width: "100%",
+    alignSelf: "center",
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: Spacing.four,
-    paddingTop: 50,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.two,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.two,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.two,
-    backgroundColor: "#00000008",
-  },
-  time: { fontWeight: "600", width: 50 },
-  error: { color: "red", textAlign: "center", padding: Spacing.three },
-  fab: {
-    position: "absolute",
-    right: 20,
-    bottom: 30,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#2563EB",
+  navButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Palette.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
     alignItems: "center",
     justifyContent: "center",
   },
-  fabText: { color: "white", fontSize: 28, lineHeight: 30 },
+  dateContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dateBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.one,
+  },
+  todayIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Palette.secondary,
+  },
+  dateTitle: {
+    textTransform: "capitalize",
+    fontWeight: "700",
+    fontSize: 18,
+    color: Palette.textPrimary,
+    letterSpacing: -0.2,
+  },
+  dateTitleToday: {
+    color: Palette.secondary,
+    fontSize: 20,
+  },
+  todaySublink: {
+    fontSize: 12,
+    color: Palette.secondary,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  summaryRow: {
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.two,
+  },
+  summaryText: {
+    fontSize: 12,
+    color: Palette.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    fontWeight: "600",
+  },
+  listContent: {
+    paddingHorizontal: Spacing.four,
+    paddingBottom: 100,
+    gap: Spacing.two,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    borderRadius: BorderRadius.card,
+    backgroundColor: Palette.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+  },
+  timeColumn: {
+    width: 64,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  timeText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: Palette.secondary,
+  },
+  endTimeText: {
+    fontSize: 11,
+    color: Palette.textMuted,
+    marginTop: 1,
+  },
+  verticalDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: Palette.borderSubtle,
+    marginRight: Spacing.two,
+  },
+  infoColumn: {
+    flex: 1,
+    gap: 3,
+    paddingRight: Spacing.two,
+  },
+  customerName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Palette.textPrimary,
+  },
+  serviceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  serviceName: {
+    fontSize: 13,
+    color: Palette.textMuted,
+  },
+  actionsColumn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
   badge: {
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: BorderRadius.pill,
   },
   badgeText: {
-    color: "white",
     fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+  cancelButton: {
+    padding: 2,
+  },
+  loadingContainer: {
+    paddingVertical: Spacing.six,
+    alignItems: "center",
+  },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Palette.errorContainer,
+    padding: Spacing.three,
+    marginHorizontal: Spacing.four,
+    marginBottom: Spacing.two,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.two,
+  },
+  errorText: {
+    color: Palette.error,
+    fontSize: 13,
+    flex: 1,
+  },
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.six,
+    gap: Spacing.two,
+  },
+  emptyIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Palette.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.two,
+  },
+  emptyTitle: {
+    fontSize: 16,
     fontWeight: "600",
+    color: Palette.textPrimary,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: Palette.textMuted,
+    textAlign: "center",
+    maxWidth: 240,
+  },
+  fab: {
+    position: "absolute",
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Palette.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Palette.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fabPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.96 }],
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });

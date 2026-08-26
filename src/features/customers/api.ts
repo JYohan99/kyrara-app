@@ -1,21 +1,7 @@
 import { API_BASE_URL } from "@/config/api";
+import { Customer, CustomerWithHistory } from "./models";
 
-export type Customer = {
-  id: string;
-  name: string | null;
-  phone: string;
-  notes: string | null;
-};
-
-export type CustomerWithHistory = Customer & {
-  appointments: {
-    id: string;
-    date: string;
-    start_time: string;
-    status: string;
-    service_name: string;
-  }[];
-};
+export type { Customer, CustomerWithHistory };
 
 export async function listCustomers(search?: string): Promise<Customer[]> {
   const url = search

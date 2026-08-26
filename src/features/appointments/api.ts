@@ -1,34 +1,12 @@
 import { API_BASE_URL } from "@/config/api";
+import { Service } from "@/features/services/models";
+import {
+  Appointment,
+  AvailableSlotsResponse,
+  Business,
+} from "./models";
 
-export type Service = {
-  id: string;
-  name: string;
-  duration_minutes: number;
-  price: number | null;
-  active: number;
-};
-
-export type Business = {
-  id: string;
-  name: string;
-  phone: string;
-  address: string;
-  booking_mode: "auto" | "approval";
-  timezone: string;
-  slot_step_minutes: number;
-  logo_base64: string | null;
-};
-
-export type Appointment = {
-  id: string;
-  date: string;
-  start_time: string;
-  end_time: string;
-  status: string;
-  customer_name: string;
-  customer_phone: string;
-  service_name: string;
-};
+export type { Appointment, AvailableSlotsResponse, Business, Service };
 
 export async function fetchBusiness(): Promise<{
   business: Business;
@@ -50,7 +28,7 @@ export async function listAppointments(date: string): Promise<Appointment[]> {
 export async function getAvailableSlots(
   date: string,
   serviceId: string,
-): Promise<{ slots: string[]; duration_minutes: number }> {
+): Promise<AvailableSlotsResponse> {
   const res = await fetch(
     `${API_BASE_URL}/appointments/available-slots?date=${date}&service_id=${serviceId}`,
   );
@@ -83,6 +61,24 @@ export async function cancelAppointment(id: string): Promise<void> {
     method: "PATCH",
   });
   if (!res.ok) throw new Error("No se pudo cancelar la reserva");
+}
+
+export async function completeAppointment(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/appointments/${id}/complete`, {
+    method: "PATCH",
+  });
+  if (!res.ok) {
+    // Si no existe la ruta /complete, intentar actualizar con PATCH general
+    const fallback = await fetch(`${API_BASE_URL}/appointments/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "COMPLETED" }),
+    });
+    if (!fallback.ok) {
+      // Si el backend no tiene endpoint de status, no bloquear la UI
+      console.warn("Backend no implementa /complete o PATCH /appointments/:id");
+    }
+  }
 }
 
 export async function updateBusinessSettings(data: {

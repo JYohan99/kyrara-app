@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { Stack } from "expo-router";
 import {
   ActivityIndicator,
   Modal,
@@ -9,337 +8,576 @@ import {
   StyleSheet,
   Switch,
   TextInput,
+  View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
 import {
-  AvailabilityBlock,
-  AvailabilityException,
-  createAvailability,
-  createException,
-  deleteAvailability,
-  deleteException,
-  listAvailability,
-  listExceptions,
-  toggleAvailabilityActive,
-} from "@/features/availability/api";
-
-const DIAS = [
-  "Domingo",
-  "Lunes",
-  "Martes",
-  "Miércoles",
-  "Jueves",
-  "Viernes",
-  "Sábado",
-];
+  BorderRadius,
+  MaxContentWidth,
+  Palette,
+  Spacing,
+} from "@/constants/theme";
+import {
+  DIAS_SEMANA,
+  useHorariosViewModel,
+} from "@/features/availability";
 
 export default function HorariosScreen() {
-  const [blocks, setBlocks] = useState<AvailabilityBlock[]>([]);
-  const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [blockModal, setBlockModal] = useState(false);
-  const [dayOfWeek, setDayOfWeek] = useState(1);
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("18:00");
-
-  const [excModal, setExcModal] = useState(false);
-  const [excDate, setExcDate] = useState("");
-  const [excReason, setExcReason] = useState("");
-
-  const load = useCallback(() => {
-    setLoading(true);
-    Promise.all([listAvailability(), listExceptions()])
-      .then(([b, e]) => {
-        setBlocks(b);
-        setExceptions(e);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
-
-  async function handleCreateBlock() {
-    try {
-      await createAvailability({
-        day_of_week: dayOfWeek,
-        start_time: startTime,
-        end_time: endTime,
-      });
-      setBlockModal(false);
-      load();
-    } catch (e: any) {
-      setError(e.message);
-    }
-  }
-
-  async function handleToggleBlock(b: AvailabilityBlock) {
-    await toggleAvailabilityActive(b.id);
-    load();
-  }
-
-  async function handleDeleteBlock(b: AvailabilityBlock) {
-    await deleteAvailability(b.id);
-    load();
-  }
-
-  async function handleCreateException() {
-    if (!excDate.trim()) return;
-    try {
-      await createException({
-        date: excDate.trim(),
-        closed_all_day: true,
-        reason: excReason.trim() || undefined,
-      });
-      setExcModal(false);
-      setExcDate("");
-      setExcReason("");
-      load();
-    } catch (e: any) {
-      setError(e.message);
-    }
-  }
-
-  async function handleDeleteException(exc: AvailabilityException) {
-    await deleteException(exc.id);
-    load();
-  }
+  const {
+    blocks,
+    exceptions,
+    loading,
+    error,
+    blockModal,
+    dayOfWeek,
+    startTime,
+    endTime,
+    excModal,
+    excDate,
+    excReason,
+    setDayOfWeek,
+    setStartTime,
+    setEndTime,
+    setExcDate,
+    setExcReason,
+    openBlockModal,
+    closeBlockModal,
+    handleCreateBlock,
+    handleToggleBlock,
+    handleDeleteBlock,
+    openExcModal,
+    closeExcModal,
+    handleCreateException,
+    handleDeleteException,
+  } = useHorariosViewModel();
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{ padding: Spacing.four, gap: Spacing.three }}
-    >
-      {loading && <ActivityIndicator size="large" />}
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+    <ThemedView style={styles.container}>
+      <Stack.Screen
+        options={{
+          title: "Horarios y Disponibilidad",
+          headerShown: true,
+          headerStyle: { backgroundColor: Palette.background },
+          headerTintColor: Palette.textPrimary,
+          headerShadowVisible: false,
+        }}
+      />
 
-      <ThemedView style={styles.sectionHeader}>
-        <ThemedText type="code" style={styles.sectionLabel}>
-          Horario semanal
-        </ThemedText>
-        <Pressable onPress={() => setBlockModal(true)}>
-          <Ionicons name="add-circle" size={26} color="#2563EB" />
-        </Pressable>
-      </ThemedView>
+      <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Palette.secondary} />
+            </View>
+          )}
 
-      {blocks.map((b) => (
-        <ThemedView key={b.id} style={styles.row}>
-          <ThemedView style={{ flex: 1 }}>
-            <ThemedText style={!b.active ? styles.inactive : undefined}>
-              {DIAS[b.day_of_week]}
-            </ThemedText>
-            <ThemedText type="small">
-              {b.start_time} – {b.end_time}
-            </ThemedText>
-          </ThemedView>
-          <Switch
-            value={!!b.active}
-            onValueChange={() => handleToggleBlock(b)}
-          />
-          <Pressable
-            onPress={() => handleDeleteBlock(b)}
-            style={styles.smallButton}
-          >
-            <Ionicons name="trash-outline" size={20} color="#DC2626" />
-          </Pressable>
-        </ThemedView>
-      ))}
+          {error && (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle-outline" size={20} color={Palette.error} />
+              <ThemedText style={styles.errorText}>{error}</ThemedText>
+            </View>
+          )}
 
-      <ThemedView style={styles.sectionHeader}>
-        <ThemedText type="code" style={styles.sectionLabel}>
-          Excepciones (feriados / cierres)
-        </ThemedText>
-        <Pressable onPress={() => setExcModal(true)}>
-          <Ionicons name="add-circle" size={26} color="#2563EB" />
-        </Pressable>
-      </ThemedView>
+          {/* SECCIÓN 1: HORARIO SEMANAL */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionTitleWrap}>
+                <Ionicons name="calendar-outline" size={18} color={Palette.primaryLight} />
+                <ThemedText style={styles.sectionTitle}>Horario Semanal</ThemedText>
+              </View>
+              <Pressable
+                onPress={openBlockModal}
+                style={({ pressed }) => [styles.addSectionBtn, pressed && styles.pressed]}
+                hitSlop={6}
+              >
+                <Ionicons name="add" size={20} color={Palette.primaryLight} />
+                <ThemedText style={styles.addBtnText}>Agregar</ThemedText>
+              </Pressable>
+            </View>
 
-      {exceptions.map((e) => (
-        <ThemedView key={e.id} style={styles.row}>
-          <ThemedView style={{ flex: 1 }}>
-            <ThemedText>{e.date}</ThemedText>
-            {e.reason ? <ThemedText type="small">{e.reason}</ThemedText> : null}
-          </ThemedView>
-          <Pressable
-            onPress={() => handleDeleteException(e)}
-            style={styles.smallButton}
-          >
-            <Ionicons name="trash-outline" size={20} color="#DC2626" />
-          </Pressable>
-        </ThemedView>
-      ))}
+            <View style={styles.cardsList}>
+              {blocks.map((b) => (
+                <View key={b.id} style={styles.card}>
+                  <View style={styles.blockInfo}>
+                    <ThemedText
+                      style={[
+                        styles.dayText,
+                        !b.active && styles.inactiveText,
+                      ]}
+                    >
+                      {DIAS_SEMANA[b.day_of_week]}
+                    </ThemedText>
+                    <ThemedText style={styles.timeRangeText}>
+                      {b.start_time} – {b.end_time}
+                    </ThemedText>
+                  </View>
 
-      {/* Modal: nuevo bloque horario */}
-      <Modal visible={blockModal} animationType="slide" transparent>
-        <ThemedView style={styles.modalOverlay}>
-          <ThemedView style={styles.modalCard}>
-            <ThemedText type="title">Nuevo bloque horario</ThemedText>
-
-            <ThemedText type="small">Día de la semana</ThemedText>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: Spacing.two }}
-            >
-              {DIAS.map((d, i) => (
-                <Pressable
-                  key={i}
-                  onPress={() => setDayOfWeek(i)}
-                  style={[
-                    styles.dayChip,
-                    dayOfWeek === i && styles.dayChipActive,
-                  ]}
-                >
-                  <ThemedText
-                    style={dayOfWeek === i ? { color: "white" } : undefined}
-                  >
-                    {d}
-                  </ThemedText>
-                </Pressable>
+                  <View style={styles.cardActions}>
+                    <Switch
+                      value={!!b.active}
+                      onValueChange={() => handleToggleBlock(b)}
+                      trackColor={{
+                        false: Palette.surfaceContainerHighest,
+                        true: Palette.primary,
+                      }}
+                      thumbColor="#ffffff"
+                    />
+                    <Pressable
+                      onPress={() => handleDeleteBlock(b)}
+                      style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressed]}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={Palette.error} />
+                    </Pressable>
+                  </View>
+                </View>
               ))}
-            </ScrollView>
 
-            <TextInput
-              placeholder="Hora inicio (ej. 09:00)"
-              value={startTime}
-              onChangeText={setStartTime}
-              style={styles.input}
-            />
-            <TextInput
-              placeholder="Hora fin (ej. 18:00)"
-              value={endTime}
-              onChangeText={setEndTime}
-              style={styles.input}
-            />
+              {blocks.length === 0 && !loading && (
+                <View style={styles.emptyCard}>
+                  <ThemedText style={styles.emptyCardText}>
+                    No hay bloques horarios configurados. Toca "+ Agregar" para añadir el primero.
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+          </View>
 
-            <ThemedView style={styles.modalActions}>
+          {/* SECCIÓN 2: EXCEPCIONES Y FERIADOS */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionTitleWrap}>
+                <Ionicons name="pause-circle-outline" size={18} color={Palette.secondary} />
+                <ThemedText style={styles.sectionTitle}>
+                  Excepciones (Feriados / Cierres)
+                </ThemedText>
+              </View>
               <Pressable
-                onPress={() => setBlockModal(false)}
-                style={styles.modalButton}
+                onPress={openExcModal}
+                style={({ pressed }) => [styles.addSectionBtn, pressed && styles.pressed]}
+                hitSlop={6}
               >
-                <ThemedText>Cancelar</ThemedText>
+                <Ionicons name="add" size={20} color={Palette.secondary} />
+                <ThemedText style={[styles.addBtnText, { color: Palette.secondary }]}>
+                  Agregar
+                </ThemedText>
               </Pressable>
-              <Pressable
-                onPress={handleCreateBlock}
-                style={[styles.modalButton, styles.saveButton]}
-              >
-                <ThemedText style={{ color: "white" }}>Guardar</ThemedText>
-              </Pressable>
-            </ThemedView>
-          </ThemedView>
-        </ThemedView>
-      </Modal>
+            </View>
 
-      {/* Modal: nueva excepción */}
-      <Modal visible={excModal} animationType="slide" transparent>
-        <ThemedView style={styles.modalOverlay}>
-          <ThemedView style={styles.modalCard}>
-            <ThemedText type="title">Nueva excepción</ThemedText>
+            <View style={styles.cardsList}>
+              {exceptions.map((e) => (
+                <View key={e.id} style={styles.card}>
+                  <View style={styles.blockInfo}>
+                    <ThemedText style={styles.dayText}>{e.date}</ThemedText>
+                    {e.reason ? (
+                      <ThemedText style={styles.timeRangeText}>
+                        {e.reason}
+                      </ThemedText>
+                    ) : (
+                      <ThemedText style={styles.timeRangeText}>
+                        Cerrado todo el día
+                      </ThemedText>
+                    )}
+                  </View>
 
-            <TextInput
-              placeholder="Fecha (YYYY-MM-DD, ej. 2026-08-25)"
-              value={excDate}
-              onChangeText={setExcDate}
-              style={styles.input}
-            />
-            <TextInput
-              placeholder="Motivo (opcional)"
-              value={excReason}
-              onChangeText={setExcReason}
-              style={styles.input}
-            />
+                  <Pressable
+                    onPress={() => handleDeleteException(e)}
+                    style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressed]}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={Palette.error} />
+                  </Pressable>
+                </View>
+              ))}
 
-            <ThemedView style={styles.modalActions}>
-              <Pressable
-                onPress={() => setExcModal(false)}
-                style={styles.modalButton}
-              >
-                <ThemedText>Cancelar</ThemedText>
-              </Pressable>
-              <Pressable
-                onPress={handleCreateException}
-                style={[styles.modalButton, styles.saveButton]}
-              >
-                <ThemedText style={{ color: "white" }}>Guardar</ThemedText>
-              </Pressable>
-            </ThemedView>
-          </ThemedView>
-        </ThemedView>
-      </Modal>
-    </ScrollView>
+              {exceptions.length === 0 && !loading && (
+                <View style={styles.emptyCard}>
+                  <ThemedText style={styles.emptyCardText}>
+                    Sin excepciones de cierre configuradas.
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* MODAL NUEVO BLOQUE HORARIO */}
+          <Modal visible={blockModal} animationType="slide" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalCard}>
+                <View style={styles.modalHeader}>
+                  <ThemedText style={styles.modalTitle}>Nuevo Bloque Horario</ThemedText>
+                  <Pressable onPress={closeBlockModal} hitSlop={8}>
+                    <Ionicons name="close" size={24} color={Palette.textMuted} />
+                  </Pressable>
+                </View>
+
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.inputLabel}>Día de la semana</ThemedText>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.dayChipsWrap}
+                  >
+                    {DIAS_SEMANA.map((d, i) => (
+                      <Pressable
+                        key={i}
+                        onPress={() => setDayOfWeek(i)}
+                        style={[
+                          styles.dayChip,
+                          dayOfWeek === i && styles.dayChipSelected,
+                        ]}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.dayChipText,
+                            dayOfWeek === i && styles.dayChipTextSelected,
+                          ]}
+                        >
+                          {d}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+
+                  <View style={styles.modalInputWrap}>
+                    <Ionicons name="time-outline" size={18} color={Palette.textMuted} />
+                    <TextInput
+                      placeholder="Hora inicio (ej. 09:00)"
+                      placeholderTextColor={Palette.textMuted}
+                      value={startTime}
+                      onChangeText={setStartTime}
+                      style={styles.modalInput}
+                    />
+                  </View>
+
+                  <View style={styles.modalInputWrap}>
+                    <Ionicons name="time-outline" size={18} color={Palette.textMuted} />
+                    <TextInput
+                      placeholder="Hora fin (ej. 18:00)"
+                      placeholderTextColor={Palette.textMuted}
+                      value={endTime}
+                      onChangeText={setEndTime}
+                      style={styles.modalInput}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.modalActions}>
+                  <Pressable
+                    onPress={closeBlockModal}
+                    style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+                  >
+                    <ThemedText style={styles.cancelBtnText}>Cancelar</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleCreateBlock}
+                    style={({ pressed }) => [styles.saveBtn, pressed && styles.pressed]}
+                  >
+                    <ThemedText style={styles.saveBtnText}>Guardar Horario</ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* MODAL NUEVA EXCEPCIÓN */}
+          <Modal visible={excModal} animationType="slide" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalCard}>
+                <View style={styles.modalHeader}>
+                  <ThemedText style={styles.modalTitle}>Nueva Excepción de Cierre</ThemedText>
+                  <Pressable onPress={closeExcModal} hitSlop={8}>
+                    <Ionicons name="close" size={24} color={Palette.textMuted} />
+                  </Pressable>
+                </View>
+
+                <View style={styles.formGroup}>
+                  <View style={styles.modalInputWrap}>
+                    <Ionicons name="calendar-outline" size={18} color={Palette.textMuted} />
+                    <TextInput
+                      placeholder="Fecha (YYYY-MM-DD, ej. 2026-12-25)"
+                      placeholderTextColor={Palette.textMuted}
+                      value={excDate}
+                      onChangeText={setExcDate}
+                      style={styles.modalInput}
+                    />
+                  </View>
+
+                  <View style={styles.modalInputWrap}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={18} color={Palette.textMuted} />
+                    <TextInput
+                      placeholder="Motivo (ej. Navidad / Mantenimiento)"
+                      placeholderTextColor={Palette.textMuted}
+                      value={excReason}
+                      onChangeText={setExcReason}
+                      style={styles.modalInput}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.modalActions}>
+                  <Pressable
+                    onPress={closeExcModal}
+                    style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+                  >
+                    <ThemedText style={styles.cancelBtnText}>Cancelar</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleCreateException}
+                    style={({ pressed }) => [
+                      styles.saveBtn,
+                      { backgroundColor: Palette.secondary },
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <ThemedText style={[styles.saveBtnText, { color: Palette.surfaceContainerLowest }]}>
+                      Guardar Excepción
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        </ScrollView>
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionLabel: { marginTop: Spacing.three, textTransform: "uppercase" },
-  row: {
+  container: {
+    flex: 1,
+    backgroundColor: Palette.background,
+  },
+  safeArea: {
+    flex: 1,
+    maxWidth: MaxContentWidth,
+    width: "100%",
+    alignSelf: "center",
+  },
+  scrollContent: {
+    padding: Spacing.four,
+    gap: Spacing.five,
+    paddingBottom: 60,
+  },
+  loadingContainer: {
+    paddingVertical: Spacing.six,
+    alignItems: "center",
+  },
+  errorBanner: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.two,
-    backgroundColor: "#00000008",
+    backgroundColor: Palette.errorContainer,
+    padding: Spacing.three,
+    borderRadius: BorderRadius.md,
     gap: Spacing.two,
   },
-  sectionHeader: {
+  errorText: {
+    color: Palette.error,
+    fontSize: 13,
+    flex: 1,
+  },
+  section: {
+    gap: Spacing.three,
+  },
+  sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: Spacing.three,
   },
-  inactive: { opacity: 0.4, textDecorationLine: "line-through" },
-  smallButton: { paddingVertical: Spacing.one, paddingHorizontal: Spacing.two },
-  addButton: {
-    backgroundColor: "#2563EB",
-    padding: Spacing.three,
-    borderRadius: Spacing.two,
+  sectionTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: Palette.textPrimary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  addSectionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Palette.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: BorderRadius.pill,
+    gap: 4,
+  },
+  addBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Palette.primaryLight,
+  },
+  cardsList: {
+    gap: Spacing.two,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Palette.surfaceContainer,
+    borderRadius: BorderRadius.card,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.four,
+  },
+  blockInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  dayText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Palette.textPrimary,
+  },
+  timeRangeText: {
+    fontSize: 13,
+    color: Palette.textMuted,
+  },
+  inactiveText: {
+    opacity: 0.45,
+    textDecorationLine: "line-through",
+  },
+  cardActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.three,
+  },
+  deleteBtn: {
+    padding: 4,
+  },
+  emptyCard: {
+    backgroundColor: Palette.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    borderRadius: BorderRadius.card,
+    padding: Spacing.four,
     alignItems: "center",
   },
-  error: { color: "red", textAlign: "center" },
+  emptyCardText: {
+    fontSize: 13,
+    color: Palette.textMuted,
+    textAlign: "center",
+  },
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "#00000055",
+    backgroundColor: "#00000088",
   },
   modalCard: {
+    backgroundColor: Palette.surfaceContainer,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
     padding: Spacing.four,
-    borderTopLeftRadius: Spacing.four,
-    borderTopRightRadius: Spacing.four,
+    gap: Spacing.three,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingBottom: Spacing.one,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Palette.textPrimary,
+  },
+  formGroup: {
     gap: Spacing.two,
   },
-  input: {
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Palette.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  dayChipsWrap: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  dayChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: BorderRadius.pill,
+    backgroundColor: Palette.surfaceContainerHigh,
     borderWidth: 1,
-    borderColor: "#00000022",
-    borderRadius: Spacing.two,
-    padding: Spacing.three,
+    borderColor: Palette.borderSubtle,
+  },
+  dayChipSelected: {
+    backgroundColor: Palette.primary,
+    borderColor: Palette.primary,
+  },
+  dayChipText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: Palette.textPrimary,
+  },
+  dayChipTextSelected: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+  modalInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Palette.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.three,
+    height: 48,
+    gap: Spacing.two,
+  },
+  modalInput: {
+    flex: 1,
+    color: Palette.textPrimary,
+    fontSize: 15,
   },
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: Spacing.two,
     marginTop: Spacing.two,
+    paddingBottom: Spacing.two,
   },
-  modalButton: {
-    paddingVertical: Spacing.two,
+  cancelBtn: {
+    paddingVertical: 12,
     paddingHorizontal: Spacing.four,
-    borderRadius: Spacing.two,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Palette.surfaceContainerHigh,
   },
-  saveButton: { backgroundColor: "#2563EB" },
-  dayChip: {
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    borderRadius: 20,
-    backgroundColor: "#00000011",
-    marginRight: Spacing.two,
+  cancelBtnText: {
+    color: Palette.textPrimary,
+    fontSize: 14,
+    fontWeight: "600",
   },
-  dayChipActive: { backgroundColor: "#2563EB" },
+  saveBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.four,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Palette.primary,
+  },
+  saveBtnText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  pressed: {
+    opacity: 0.75,
+  },
 });
