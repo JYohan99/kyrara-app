@@ -156,7 +156,7 @@ export default function HorariosScreen() {
               <View style={styles.sectionTitleWrap}>
                 <Ionicons name="pause-circle-outline" size={18} color={Palette.secondary} />
                 <ThemedText style={styles.sectionTitle}>
-                  Excepciones (Feriados / Cierres)
+                  Feriados / Cierres
                 </ThemedText>
               </View>
               <Pressable
