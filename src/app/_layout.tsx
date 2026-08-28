@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { useColorScheme } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppTabs from "@/components/app-tabs";
 import { registerForPushNotifications } from "@/core/services/notificationService";
 
@@ -14,13 +13,13 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
+    SplashScreen.hideAsync();
     registerForPushNotifications();
   }, []);
 
   return (
     <SafeAreaProvider>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <AnimatedSplashOverlay />
         <AppTabs />
       </ThemeProvider>
     </SafeAreaProvider>
