@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -20,11 +22,18 @@ import {
   Spacing,
 } from "@/constants/theme";
 import {
+  registerForPushNotifications,
+  sendTestLocalNotification,
+} from "@/core/services/notificationService";
+import {
   OPCIONES_INTERVALO,
   useConfiguracionViewModel,
 } from "@/features/appointments";
 
 export default function ConfiguracionScreen() {
+  const [testingNotif, setTestingNotif] = useState(false);
+  const [syncingToken, setSyncingToken] = useState(false);
+
   const {
     business,
     loading,
@@ -42,6 +51,46 @@ export default function ConfiguracionScreen() {
     handleSelectMode,
     handleSelectInterval,
   } = useConfiguracionViewModel();
+
+  const handleTestNotification = async () => {
+    setTestingNotif(true);
+    try {
+      await sendTestLocalNotification(
+        "💈 Kyrara Barber",
+        "¡Notificación de prueba recibida con éxito en tu teléfono!"
+      );
+      Alert.alert(
+        "Notificación Enviada",
+        "Se ha enviado la alerta de prueba a la barra de notificaciones."
+      );
+    } catch {
+      Alert.alert("Error", "No se pudo enviar la notificación de prueba.");
+    } finally {
+      setTestingNotif(false);
+    }
+  };
+
+  const handleSyncPushToken = async () => {
+    setSyncingToken(true);
+    try {
+      const token = await registerForPushNotifications();
+      if (token) {
+        Alert.alert(
+          "Token Registrado",
+          "Tu teléfono ha quedado vinculado exitosamente al servidor para recibir alertas de WhatsApp."
+        );
+      } else {
+        Alert.alert(
+          "Atención",
+          "No se pudo obtener el token. Asegúrate de tener concedidos los permisos de notificaciones."
+        );
+      }
+    } catch {
+      Alert.alert("Error", "Ocurrió un problema al sincronizar el token.");
+    } finally {
+      setSyncingToken(false);
+    }
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -290,6 +339,63 @@ export default function ConfiguracionScreen() {
               </View>
             )}
           </View>
+
+          {/* SECCIÓN 5: NOTIFICACIONES Y ALERTAS */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="notifications-outline" size={18} color={Palette.primaryLight} />
+              <ThemedText style={styles.sectionTitle}>
+                Notificaciones y Alertas
+              </ThemedText>
+            </View>
+            <ThemedText style={styles.sectionDescription}>
+              Configura y comprueba la recepción de avisos automáticos cuando los clientes agenden citas.
+            </ThemedText>
+
+            <View style={styles.notifBtnGroup}>
+              <Pressable
+                onPress={handleTestNotification}
+                disabled={testingNotif}
+                style={({ pressed }) => [
+                  styles.notifBtnSecondary,
+                  testingNotif && styles.btnDisabled,
+                  pressed && styles.pressed,
+                ]}
+              >
+                {testingNotif ? (
+                  <ActivityIndicator size="small" color={Palette.secondary} />
+                ) : (
+                  <>
+                    <Ionicons name="volume-high-outline" size={18} color={Palette.secondary} />
+                    <ThemedText style={styles.notifBtnSecondaryText}>
+                      Probar Alerta en este Dispositivo
+                    </ThemedText>
+                  </>
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={handleSyncPushToken}
+                disabled={syncingToken}
+                style={({ pressed }) => [
+                  styles.notifBtnPrimary,
+                  syncingToken && styles.btnDisabled,
+                  pressed && styles.pressed,
+                ]}
+              >
+                {syncingToken ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Ionicons name="sync-outline" size={18} color="#ffffff" />
+                    <ThemedText style={styles.notifBtnPrimaryText}>
+                      Vincular Teléfono para Alertas de WhatsApp
+                    </ThemedText>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          </View>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -497,5 +603,41 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.75,
+  },
+  notifBtnGroup: {
+    gap: Spacing.two,
+    marginTop: Spacing.one,
+  },
+  notifBtnSecondary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Palette.surfaceContainerHigh,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.four,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    gap: Spacing.two,
+  },
+  notifBtnSecondaryText: {
+    color: Palette.secondary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  notifBtnPrimary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Palette.primary,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.four,
+    gap: Spacing.two,
+  },
+  notifBtnPrimaryText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });
