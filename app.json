@@ -8,12 +8,13 @@
     "scheme": "kyraraapp",
     "userInterfaceStyle": "automatic",
     "android": {
+      "package": "com.anonymous.Kyraraapp",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#101415",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Kyraraapp"
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
@@ -33,6 +34,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5c8c9fd7-65c8-45ae-a8d5-db1d5c174b2a"
+      }
+    },
+    "owner": "jyohan99"
   }
 }

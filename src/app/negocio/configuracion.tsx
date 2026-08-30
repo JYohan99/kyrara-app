@@ -73,20 +73,20 @@ export default function ConfiguracionScreen() {
   const handleSyncPushToken = async () => {
     setSyncingToken(true);
     try {
-      const token = await registerForPushNotifications();
-      if (token) {
+      const res = await registerForPushNotifications();
+      if (res.success) {
         Alert.alert(
-          "Token Registrado",
-          "Tu teléfono ha quedado vinculado exitosamente al servidor para recibir alertas de WhatsApp."
+          "Teléfono Vinculado",
+          "Tu teléfono ha quedado registrado exitosamente en el servidor para recibir alertas de nuevas citas."
         );
       } else {
         Alert.alert(
-          "Atención",
-          "No se pudo obtener el token. Asegúrate de tener concedidos los permisos de notificaciones."
+          "No se pudo vincular",
+          res.error || "Ocurrió un error al obtener el token de notificaciones."
         );
       }
-    } catch {
-      Alert.alert("Error", "Ocurrió un problema al sincronizar el token.");
+    } catch (err: any) {
+      Alert.alert("Error inesperado", err?.message || "Ocurrió un problema al sincronizar el token.");
     } finally {
       setSyncingToken(false);
     }

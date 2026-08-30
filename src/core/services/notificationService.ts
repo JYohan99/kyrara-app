@@ -5,19 +5,25 @@ import { Platform } from "react-native";
 
 const isExpoGo = Constants.appOwnership === "expo";
 
-export async function registerForPushNotifications(): Promise<string | null> {
+export type PushRegistrationResult = {
+  success: boolean;
+  token?: string;
+  error?: string;
+};
+
+export async function registerForPushNotifications(): Promise<PushRegistrationResult> {
   if (isExpoGo) {
-    console.log(
-      "Notificaciones push remotas no disponibles en Expo Go (desde SDK 53). Usa una compilación de desarrollo o APK standalone para probarlas.",
-    );
-    return null;
+    return {
+      success: false,
+      error: "Las notificaciones remotas requieren un APK / build independiente (no Expo Go).",
+    };
   }
 
   if (!Device.isDevice) {
-    console.log(
-      "Las notificaciones push requieren un dispositivo físico o un emulador con Google Play Services.",
-    );
-    return null;
+    return {
+      success: false,
+      error: "Las notificaciones push requieren un dispositivo físico real.",
+    };
   }
 
   const Notifications = await import("expo-notifications");
@@ -51,19 +57,35 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   if (finalStatus !== "granted") {
-    console.log("Permiso de notificaciones no otorgado por el usuario.");
-    return null;
+    return {
+      success: false,
+      error: "Permiso de notificaciones denegado en el sistema del teléfono.",
+    };
   }
 
   try {
-    const projectId =
-      Constants.expoConfig?.extra?.eas?.projectId ??
-      Constants.easConfig?.projectId;
+    let token: string | undefined;
 
-    const tokenData = await Notifications.getExpoPushTokenAsync(
-      projectId ? { projectId } : undefined,
-    );
-    const token = tokenData.data;
+    try {
+      const deviceToken = await Notifications.getDevicePushTokenAsync();
+      token = deviceToken.data;
+    } catch {
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        Constants.easConfig?.projectId;
+
+      const tokenData = await Notifications.getExpoPushTokenAsync(
+        projectId ? { projectId } : undefined,
+      );
+      token = tokenData.data;
+    }
+
+    if (!token) {
+      return {
+        success: false,
+        error: "No se pudo generar el token de notificaciones del dispositivo.",
+      };
+    }
 
     const res = await fetch(`${API_BASE_URL}/appointments/business/push-token`, {
       method: "POST",
@@ -72,15 +94,22 @@ export async function registerForPushNotifications(): Promise<string | null> {
     });
 
     if (!res.ok) {
-      console.error("Error al registrar el token en el servidor:", res.status);
-    } else {
-      console.log("Token de notificaciones registrado exitosamente:", token);
+      return {
+        success: false,
+        token,
+        error: `Servidor respondió con error HTTP ${res.status}`,
+      };
     }
 
-    return token;
-  } catch (err) {
-    console.error("No se pudo registrar el token de notificaciones:", err);
-    return null;
+    console.log("Token de notificaciones registrado exitosamente:", token);
+    return { success: true, token };
+  } catch (err: any) {
+    const errorMessage = err?.message || String(err);
+    console.error("No se pudo registrar el token de notificaciones:", errorMessage);
+    return {
+      success: false,
+      error: errorMessage,
+    };
   }
 }
 
