@@ -1,9 +1,20 @@
 import { API_BASE_URL } from "@/config/api";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
 const isExpoGo = Constants.appOwnership === "expo";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export type PushRegistrationResult = {
   success: boolean;
@@ -25,18 +36,6 @@ export async function registerForPushNotifications(): Promise<PushRegistrationRe
       error: "Las notificaciones push requieren un dispositivo físico real.",
     };
   }
-
-  const Notifications = await import("expo-notifications");
-
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
 
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
@@ -115,12 +114,22 @@ export async function registerForPushNotifications(): Promise<PushRegistrationRe
 
 export async function sendTestLocalNotification(title: string, body: string) {
   try {
-    const Notifications = await import("expo-notifications");
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "Citas y Alertas Kyrara",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#8A4FFF",
+        sound: "default",
+      });
+    }
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
         body,
         sound: "default",
+        priority: Notifications.AndroidNotificationPriority.MAX,
       },
       trigger: null, // Inmediata
     });
