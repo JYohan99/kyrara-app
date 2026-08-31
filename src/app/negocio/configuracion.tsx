@@ -1,26 +1,6 @@
-import { Ionicons } from "@expo/vector-icons";
-import { Stack } from "expo-router";
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import {
-  BorderRadius,
-  MaxContentWidth,
-  Palette,
-  Spacing,
-} from "@/constants/theme";
+import { BorderRadius, MaxContentWidth, Palette, Spacing } from "@/constants/theme";
 import {
   registerForPushNotifications,
   sendTestLocalNotification,
@@ -28,12 +8,27 @@ import {
 import {
   OPCIONES_INTERVALO,
   useConfiguracionViewModel,
-} from "@/features/appointments";
+} from "@/features/appointments/view-models/useConfiguracionViewModel";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  TextInput,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+// ============================================================================
+// PANTALLA: CONFIGURACIÓN GENERAL DEL NEGOCIO Y NOTIFICACIONES
+// ============================================================================
 
 export default function ConfiguracionScreen() {
-  const [testingNotif, setTestingNotif] = useState(false);
-  const [syncingToken, setSyncingToken] = useState(false);
-
   const {
     business,
     loading,
@@ -43,6 +38,7 @@ export default function ConfiguracionScreen() {
     phone,
     address,
     logoBase64,
+    notifyUpcoming,
     setName,
     setPhone,
     setAddress,
@@ -50,18 +46,22 @@ export default function ConfiguracionScreen() {
     handleSaveInfo,
     handleSelectMode,
     handleSelectInterval,
+    handleToggleNotifyUpcoming,
   } = useConfiguracionViewModel();
 
+  // Estados locales para pruebas de notificación
+  const [testingNotif, setTestingNotif] = useState(false);
+  const [syncingToken, setSyncingToken] = useState(false);
+
+  // --------------------------------------------------------------------------
+  // DISPARAR NOTIFICACIÓN LOCAL DE PRUEBA
+  // --------------------------------------------------------------------------
   const handleTestNotification = async () => {
     setTestingNotif(true);
     try {
       await sendTestLocalNotification(
         "💈 Kyrara Barber",
         "¡Notificación de prueba recibida con éxito en tu teléfono!"
-      );
-      Alert.alert(
-        "Notificación Enviada",
-        "Se ha enviado la alerta de prueba a la barra de notificaciones."
       );
     } catch {
       Alert.alert("Error", "No se pudo enviar la notificación de prueba.");
@@ -70,6 +70,9 @@ export default function ConfiguracionScreen() {
     }
   };
 
+  // --------------------------------------------------------------------------
+  // VINCULAR TOKEN FCM DE GOOGLE FIREBASE CON EL BACKEND
+  // --------------------------------------------------------------------------
   const handleSyncPushToken = async () => {
     setSyncingToken(true);
     try {
@@ -82,11 +85,11 @@ export default function ConfiguracionScreen() {
       } else {
         Alert.alert(
           "No se pudo vincular",
-          res.error || "Ocurrió un error al obtener el token de notificaciones."
+          res.error || "Asegúrate de tener concedidos los permisos de notificación."
         );
       }
     } catch (err: any) {
-      Alert.alert("Error inesperado", err?.message || "Ocurrió un problema al sincronizar el token.");
+      Alert.alert("Error", err?.message || "Ocurrió un error al vincular el dispositivo.");
     } finally {
       setSyncingToken(false);
     }
@@ -94,264 +97,163 @@ export default function ConfiguracionScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen
-        options={{
-          title: "Configuración General",
-          headerShown: true,
-          headerStyle: { backgroundColor: Palette.background },
-          headerTintColor: Palette.textPrimary,
-          headerShadowVisible: false,
-        }}
-      />
-
-      <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Palette.secondary} />
-          </View>
-        )}
-
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <ScrollView
-          style={{ flex: 1 }}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
+          {/* ENCABEZADO DE LA PANTALLA */}
+          <View style={styles.header}>
+            <ThemedText style={styles.title}>Configuración</ThemedText>
+            <ThemedText style={styles.subtitle}>
+              Personaliza el perfil, los turnos y las alertas automáticas de tu barbería
+            </ThemedText>
+          </View>
+
+          {/* BANNER DE ERROR (SI OCURRE) */}
           {error && (
             <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle-outline" size={20} color={Palette.error} />
+              <Ionicons name="alert-circle-outline" size={18} color={Palette.error} />
               <ThemedText style={styles.errorText}>{error}</ThemedText>
             </View>
           )}
 
-          {/* SECCIÓN 1: LOGO DEL NEGOCIO */}
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="image-outline" size={18} color={Palette.secondary} />
-              <ThemedText style={styles.sectionTitle}>Logo del Negocio</ThemedText>
+          {/* INDICADOR DE CARGA INICIAL */}
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Palette.primary} />
             </View>
+          )}
 
-            <View style={styles.logoRow}>
-              <Pressable
-                onPress={pickLogo}
-                style={({ pressed }) => [styles.logoPicker, pressed && styles.pressed]}
-              >
-                {logoBase64 ? (
-                  <Image
-                    source={{ uri: `data:image/jpeg;base64,${logoBase64}` }}
-                    style={styles.logoPreview}
-                  />
-                ) : (
-                  <View style={styles.logoPlaceholder}>
-                    <Ionicons name="camera-outline" size={28} color={Palette.textMuted} />
-                    <ThemedText style={styles.logoPlaceholderText}>
-                      Subir foto
-                    </ThemedText>
-                  </View>
-                )}
-              </Pressable>
-
-              <View style={styles.logoDescription}>
-                <ThemedText style={styles.logoHelpTitle}>
-                  Imagen de Marca
-                </ThemedText>
-                <ThemedText style={styles.logoHelpText}>
-                  Aparece en la cabecera de la app y en los mensajes automáticos para clientes.
-                </ThemedText>
-                <Pressable onPress={pickLogo} style={styles.changePhotoButton}>
-                  <ThemedText style={styles.changePhotoText}>
-                    {logoBase64 ? "Cambiar imagen" : "Seleccionar de la galería"}
-                  </ThemedText>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-
-          {/* SECCIÓN 2: DATOS PRINCIPALES */}
+          {/* ================================================================ */}
+          {/* SECCIÓN 1: PERFIL DEL NEGOCIO (LOGO, NOMBRE, TELÉFONO, DIRECCIÓN) */}
+          {/* ================================================================ */}
           <View style={styles.sectionCard}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="business-outline" size={18} color={Palette.primaryLight} />
-              <ThemedText style={styles.sectionTitle}>Datos del Negocio</ThemedText>
+              <ThemedText style={styles.sectionTitle}>Perfil del Negocio</ThemedText>
             </View>
+            <ThemedText style={styles.sectionDescription}>
+              Esta información se mostrará a los clientes en WhatsApp y en tus reservas.
+            </ThemedText>
 
-            <View style={styles.formGroup}>
-              <View style={styles.inputWrap}>
-                <Ionicons name="storefront-outline" size={18} color={Palette.textMuted} />
-                <TextInput
-                  placeholder="Nombre del negocio"
-                  placeholderTextColor={Palette.textMuted}
-                  value={name}
-                  onChangeText={setName}
-                  style={styles.input}
-                />
-              </View>
-
-              <View style={styles.inputWrap}>
-                <Ionicons name="call-outline" size={18} color={Palette.textMuted} />
-                <TextInput
-                  placeholder="Teléfono comercial"
-                  placeholderTextColor={Palette.textMuted}
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  style={styles.input}
-                />
-              </View>
-
-              <View style={styles.inputWrap}>
-                <Ionicons name="location-outline" size={18} color={Palette.textMuted} />
-                <TextInput
-                  placeholder="Dirección del local"
-                  placeholderTextColor={Palette.textMuted}
-                  value={address}
-                  onChangeText={setAddress}
-                  style={styles.input}
-                />
-              </View>
-
+            {/* SELECCIÓN Y VISTA PREVIA DEL LOGO */}
+            <View style={styles.logoRow}>
               <Pressable
-                onPress={handleSaveInfo}
-                style={({ pressed }) => [
-                  styles.saveInfoBtn,
-                  saving && styles.btnDisabled,
-                  pressed && styles.pressed,
-                ]}
-                disabled={saving}
+                onPress={pickLogo}
+                style={({ pressed }) => [styles.logoAvatar, pressed && styles.pressed]}
               >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
+                {logoBase64 ? (
+                  <Image source={{ uri: logoBase64 }} style={styles.logoImage} />
                 ) : (
-                  <ThemedText style={styles.saveInfoBtnText}>
-                    Guardar Cambios de Perfil
-                  </ThemedText>
+                  <View style={styles.logoPlaceholder}>
+                    <Ionicons name="image-outline" size={28} color={Palette.textMuted} />
+                  </View>
                 )}
+                <View style={styles.logoBadge}>
+                  <Ionicons name="camera" size={12} color="#ffffff" />
+                </View>
               </Pressable>
-            </View>
-          </View>
 
-          {/* SECCIÓN 3: MODO DE RESERVA */}
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
-              <ThemedText style={styles.sectionTitle}>
-                Modo de Reserva por WhatsApp
-              </ThemedText>
-            </View>
-            <ThemedText style={styles.sectionDescription}>
-              Define si el bot de WhatsApp confirma la cita inmediatamente o si requiere tu aprobación manual.
-            </ThemedText>
-
-            {business && (
-              <View style={styles.optionsRow}>
-                <Pressable
-                  onPress={() => handleSelectMode("auto")}
-                  disabled={saving}
-                  style={({ pressed }) => [
-                    styles.optionChip,
-                    business.booking_mode === "auto" && styles.optionChipActivePrimary,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Ionicons
-                    name="flash-outline"
-                    size={16}
-                    color={
-                      business.booking_mode === "auto"
-                        ? "#ffffff"
-                        : Palette.textMuted
-                    }
-                  />
-                  <ThemedText
-                    style={[
-                      styles.optionChipText,
-                      business.booking_mode === "auto" && styles.optionChipTextActive,
-                    ]}
-                  >
-                    Automático
-                  </ThemedText>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => handleSelectMode("approval")}
-                  disabled={saving}
-                  style={({ pressed }) => [
-                    styles.optionChip,
-                    business.booking_mode === "approval" && styles.optionChipActiveSecondary,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Ionicons
-                    name="checkmark-circle-outline"
-                    size={16}
-                    color={
-                      business.booking_mode === "approval"
-                        ? "#ffffff"
-                        : Palette.textMuted
-                    }
-                  />
-                  <ThemedText
-                    style={[
-                      styles.optionChipText,
-                      business.booking_mode === "approval" && styles.optionChipTextActive,
-                    ]}
-                  >
-                    Con Aprobación
-                  </ThemedText>
-                </Pressable>
+              <View style={styles.logoInfo}>
+                <ThemedText style={styles.logoTitle}>Logo de la Barbería</ThemedText>
+                <ThemedText style={styles.logoSubtitle}>
+                  Toca para seleccionar una imagen cuadrada
+                </ThemedText>
               </View>
-            )}
-          </View>
-
-          {/* SECCIÓN 4: INTERVALO DE TURNOS */}
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="timer-outline" size={18} color={Palette.secondary} />
-              <ThemedText style={styles.sectionTitle}>
-                Intervalo de Horarios Ofrecidos
-              </ThemedText>
             </View>
-            <ThemedText style={styles.sectionDescription}>
-              Frecuencia temporal del motor de disponibilidad al calcular slots libres.
-            </ThemedText>
 
-            {business && (
-              <View style={styles.optionsRow}>
-                {OPCIONES_INTERVALO.map((m) => (
-                  <Pressable
-                    key={m}
-                    onPress={() => handleSelectInterval(m)}
-                    disabled={saving}
-                    style={({ pressed }) => [
-                      styles.intervalChip,
-                      business.slot_step_minutes === m && styles.intervalChipActive,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.intervalChipText,
-                        business.slot_step_minutes === m && styles.intervalChipTextActive,
-                      ]}
-                    >
-                      {m} min
-                    </ThemedText>
-                  </Pressable>
-                ))}
-              </View>
-            )}
+            {/* CAMPOS DE TEXTO */}
+            <View style={styles.fieldGroup}>
+              <ThemedText style={styles.fieldLabel}>Nombre de la Barbería</ThemedText>
+              <TextInput
+                style={styles.textInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Ej: Kyrara Barber Club"
+                placeholderTextColor={Palette.textMuted}
+              />
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <ThemedText style={styles.fieldLabel}>Teléfono de Contacto</ThemedText>
+              <TextInput
+                style={styles.textInput}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="Ej: +598 99 123 456"
+                placeholderTextColor={Palette.textMuted}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <ThemedText style={styles.fieldLabel}>Dirección</ThemedText>
+              <TextInput
+                style={styles.textInput}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Ej: Av. 18 de Julio 1234"
+                placeholderTextColor={Palette.textMuted}
+              />
+            </View>
+
+            {/* BOTÓN GUARDAR PERFIL */}
+            <Pressable
+              onPress={handleSaveInfo}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.saveButton,
+                saving && styles.btnDisabled,
+                pressed && styles.pressed,
+              ]}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-outline" size={18} color="#ffffff" />
+                  <ThemedText style={styles.saveButtonText}>Guardar Cambios</ThemedText>
+                </>
+              )}
+            </Pressable>
           </View>
 
-          {/* SECCIÓN 5: NOTIFICACIONES Y ALERTAS */}
+          {/* ================================================================ */}
+          {/* SECCIÓN 2: NOTIFICACIONES Y ALERTAS (PUSH Y RECORDATORIO 5 MIN)   */}
+          {/* ================================================================ */}
           <View style={styles.sectionCard}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="notifications-outline" size={18} color={Palette.primaryLight} />
-              <ThemedText style={styles.sectionTitle}>
-                Notificaciones y Alertas
-              </ThemedText>
+              <ThemedText style={styles.sectionTitle}>Notificaciones y Alertas</ThemedText>
             </View>
             <ThemedText style={styles.sectionDescription}>
-              Configura y comprueba la recepción de avisos automáticos cuando los clientes agenden citas.
+              Configura cómo y cuándo deseas recibir alertas automáticas en tu móvil.
             </ThemedText>
 
+            {/* SWITCH TOGGLE: RECORDATORIO 5 MIN ANTES DEL TURNO */}
+            <View style={styles.switchRow}>
+              <View style={styles.switchTextContainer}>
+                <View style={styles.switchTitleRow}>
+                  <Ionicons name="alarm-outline" size={16} color={Palette.secondary} />
+                  <ThemedText style={styles.switchTitle}>
+                    Aviso 5 minutos antes del turno
+                  </ThemedText>
+                </View>
+                <ThemedText style={styles.switchDescription}>
+                  Recibe una alerta automática en tu teléfono cuando falten 5 minutos para comenzar cada cita.
+                </ThemedText>
+              </View>
+
+              <Switch
+                value={notifyUpcoming}
+                onValueChange={handleToggleNotifyUpcoming}
+                trackColor={{ false: Palette.surfaceContainerHigh, true: Palette.primary }}
+                thumbColor={notifyUpcoming ? Palette.secondary : "#888888"}
+              />
+            </View>
+
+            {/* BOTONES DE VINCULACIÓN Y PRUEBA */}
             <View style={styles.notifBtnGroup}>
               <Pressable
                 onPress={handleTestNotification}
@@ -396,11 +298,125 @@ export default function ConfiguracionScreen() {
               </Pressable>
             </View>
           </View>
+
+          {/* ================================================================ */}
+          {/* SECCIÓN 3: MODO DE RESERVA (AUTOMÁTICO O APROBACIÓN MANUAL)       */}
+          {/* ================================================================ */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="options-outline" size={18} color={Palette.primaryLight} />
+              <ThemedText style={styles.sectionTitle}>Modo de Reserva</ThemedText>
+            </View>
+            <ThemedText style={styles.sectionDescription}>
+              Elige si las reservas confirmadas por WhatsApp se agendan automáticamente o requieren tu aprobación.
+            </ThemedText>
+
+            {business && (
+              <View style={styles.modeOptionsContainer}>
+                {/* OPCIÓN: APROBACIÓN MANUAL */}
+                <Pressable
+                  onPress={() => handleSelectMode("approval")}
+                  style={[
+                    styles.modeOptionCard,
+                    business.booking_mode === "approval" && styles.modeOptionCardActive,
+                  ]}
+                >
+                  <View style={styles.modeRadioRow}>
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        business.booking_mode === "approval" && styles.radioCircleActive,
+                      ]}
+                    >
+                      {business.booking_mode === "approval" && (
+                        <View style={styles.radioInnerCircle} />
+                      )}
+                    </View>
+                    <ThemedText style={styles.modeOptionTitle}>
+                      Con Aprobación Manual
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={styles.modeOptionSubtitle}>
+                    Las solicitudes entran en estado pendiente hasta que tú las aceptes o rechaces.
+                  </ThemedText>
+                </Pressable>
+
+                {/* OPCIÓN: CONFIRMACIÓN AUTOMÁTICA */}
+                <Pressable
+                  onPress={() => handleSelectMode("auto")}
+                  style={[
+                    styles.modeOptionCard,
+                    business.booking_mode === "auto" && styles.modeOptionCardActive,
+                  ]}
+                >
+                  <View style={styles.modeRadioRow}>
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        business.booking_mode === "auto" && styles.radioCircleActive,
+                      ]}
+                    >
+                      {business.booking_mode === "auto" && (
+                        <View style={styles.radioInnerCircle} />
+                      )}
+                    </View>
+                    <ThemedText style={styles.modeOptionTitle}>
+                      Confirmación Automática
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={styles.modeOptionSubtitle}>
+                    La reserva queda confirmada al instante en tu agenda en cuanto el cliente elige el horario.
+                  </ThemedText>
+                </Pressable>
+              </View>
+            )}
+          </View>
+
+          {/* ================================================================ */}
+          {/* SECCIÓN 4: INTERVALO DE TURNOS (DURACIÓN DE SLOTS)               */}
+          {/* ================================================================ */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="time-outline" size={18} color={Palette.primaryLight} />
+              <ThemedText style={styles.sectionTitle}>Intervalo de Turnos</ThemedText>
+            </View>
+            <ThemedText style={styles.sectionDescription}>
+              Frecuencia con la que se generarán los bloques horarios para citas (ej. 30 min genera 10:00, 10:30, 11:00...).
+            </ThemedText>
+
+            {business && (
+              <View style={styles.intervalGrid}>
+                {OPCIONES_INTERVALO.map((m) => (
+                  <Pressable
+                    key={m}
+                    onPress={() => handleSelectInterval(m)}
+                    style={[
+                      styles.intervalChip,
+                      business.slot_step_minutes === m && styles.intervalChipActive,
+                    ]}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.intervalChipText,
+                        business.slot_step_minutes === m && styles.intervalChipTextActive,
+                      ]}
+                    >
+                      {m} min
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
 }
+
+// ============================================================================
+// ESTILOS DE LA PANTALLA
+// ============================================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -417,6 +433,19 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     gap: Spacing.four,
     paddingBottom: 60,
+  },
+  header: {
+    marginBottom: Spacing.two,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: Palette.textPrimary,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: Palette.textMuted,
+    marginTop: Spacing.one,
   },
   loadingContainer: {
     paddingVertical: Spacing.six,
@@ -449,195 +478,236 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "600",
     color: Palette.textPrimary,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
   sectionDescription: {
     fontSize: 13,
     color: Palette.textMuted,
-    lineHeight: 18,
   },
   logoRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.four,
+    marginVertical: Spacing.two,
   },
-  logoPicker: {
-    width: 90,
-    height: 90,
-    borderRadius: BorderRadius.xxl,
-    backgroundColor: Palette.surfaceContainerLow,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    alignItems: "center",
+  logoAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Palette.surfaceContainerHigh,
     justifyContent: "center",
-    overflow: "hidden",
+    alignItems: "center",
+    position: "relative",
   },
-  logoPreview: {
-    width: 90,
-    height: 90,
+  logoImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
   },
   logoPlaceholder: {
-    alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    alignItems: "center",
   },
-  logoPlaceholderText: {
-    fontSize: 11,
-    color: Palette.textMuted,
-    fontWeight: "500",
+  logoBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: Palette.primary,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: Palette.surfaceContainer,
   },
-  logoDescription: {
+  logoInfo: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
-  logoHelpTitle: {
-    fontSize: 15,
+  logoTitle: {
+    fontSize: 14,
     fontWeight: "600",
     color: Palette.textPrimary,
   },
-  logoHelpText: {
+  logoSubtitle: {
     fontSize: 12,
     color: Palette.textMuted,
-    lineHeight: 16,
   },
-  changePhotoButton: {
-    marginTop: 4,
+  fieldGroup: {
+    gap: Spacing.one,
   },
-  changePhotoText: {
+  fieldLabel: {
     fontSize: 13,
-    fontWeight: "600",
-    color: Palette.secondary,
+    color: Palette.textMuted,
   },
-  formGroup: {
-    gap: Spacing.three,
-  },
-  inputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Palette.surfaceContainerLow,
+  textInput: {
+    backgroundColor: Palette.surfaceContainerHigh,
     borderWidth: 1,
-    borderColor: Palette.border,
-    borderRadius: BorderRadius.lg,
+    borderColor: Palette.borderSubtle,
+    borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.three,
-    height: 48,
-    gap: Spacing.two,
-  },
-  input: {
-    flex: 1,
+    paddingVertical: Spacing.two,
     color: Palette.textPrimary,
-    fontSize: 15,
+    fontSize: 14,
   },
-  saveInfoBtn: {
+  saveButton: {
     backgroundColor: Palette.primary,
-    height: 48,
-    borderRadius: BorderRadius.lg,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: Spacing.one,
-  },
-  saveInfoBtnText: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  optionsRow: {
-    flexDirection: "row",
+    paddingVertical: Spacing.three,
+    borderRadius: BorderRadius.md,
     gap: Spacing.two,
-    flexWrap: "wrap",
+    marginTop: Spacing.two,
   },
-  optionChip: {
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#ffffff",
+  },
+  switchRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: BorderRadius.pill,
-    backgroundColor: Palette.surfaceContainerLow,
+    justifyContent: "space-between",
+    backgroundColor: Palette.surfaceContainerHigh,
+    padding: Spacing.three,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: Palette.borderSubtle,
+    gap: Spacing.three,
+  },
+  switchTextContainer: {
+    flex: 1,
+    gap: 4,
+  },
+  switchTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
-  optionChipActivePrimary: {
-    backgroundColor: Palette.primary,
-    borderColor: Palette.primary,
-  },
-  optionChipActiveSecondary: {
-    backgroundColor: Palette.secondaryDark,
-    borderColor: Palette.secondary,
-  },
-  optionChipText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: Palette.textMuted,
-  },
-  optionChipTextActive: {
-    color: "#ffffff",
-    fontWeight: "700",
-  },
-  intervalChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: BorderRadius.pill,
-    backgroundColor: Palette.surfaceContainerLow,
-    borderWidth: 1,
-    borderColor: Palette.border,
-  },
-  intervalChipActive: {
-    backgroundColor: Palette.primary,
-    borderColor: Palette.primary,
-  },
-  intervalChipText: {
-    fontSize: 13,
+  switchTitle: {
+    fontSize: 14,
     fontWeight: "600",
+    color: Palette.textPrimary,
+  },
+  switchDescription: {
+    fontSize: 12,
     color: Palette.textMuted,
-  },
-  intervalChipTextActive: {
-    color: "#ffffff",
-    fontWeight: "700",
-  },
-  btnDisabled: {
-    opacity: 0.5,
-  },
-  pressed: {
-    opacity: 0.75,
   },
   notifBtnGroup: {
     gap: Spacing.two,
-    marginTop: Spacing.one,
+    marginTop: Spacing.two,
   },
   notifBtnSecondary: {
+    backgroundColor: Palette.surfaceContainerHigh,
+    borderWidth: 1,
+    borderColor: Palette.secondaryDark,
+    borderRadius: BorderRadius.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Palette.surfaceContainerHigh,
-    borderRadius: BorderRadius.md,
     paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.four,
-    borderWidth: 1,
-    borderColor: Palette.borderSubtle,
     gap: Spacing.two,
   },
   notifBtnSecondaryText: {
-    color: Palette.secondary,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
+    color: Palette.secondary,
   },
   notifBtnPrimary: {
+    backgroundColor: Palette.primary,
+    borderRadius: BorderRadius.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Palette.primary,
-    borderRadius: BorderRadius.md,
     paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.four,
     gap: Spacing.two,
   },
   notifBtnPrimaryText: {
-    color: "#ffffff",
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
+    color: "#ffffff",
+  },
+  modeOptionsContainer: {
+    gap: Spacing.two,
+  },
+  modeOptionCard: {
+    backgroundColor: Palette.surfaceContainerHigh,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.three,
+    gap: Spacing.one,
+  },
+  modeOptionCardActive: {
+    borderColor: Palette.primary,
+    backgroundColor: Palette.surfaceContainerHighest,
+  },
+  modeRadioRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  radioCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: Palette.textMuted,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioCircleActive: {
+    borderColor: Palette.primary,
+  },
+  radioInnerCircle: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Palette.primary,
+  },
+  modeOptionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Palette.textPrimary,
+  },
+  modeOptionSubtitle: {
+    fontSize: 12,
+    color: Palette.textMuted,
+    paddingLeft: 26,
+  },
+  intervalGrid: {
+    flexDirection: "row",
+    gap: Spacing.two,
+  },
+  intervalChip: {
+    flex: 1,
+    backgroundColor: Palette.surfaceContainerHigh,
+    borderWidth: 1,
+    borderColor: Palette.borderSubtle,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.three,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  intervalChipActive: {
+    borderColor: Palette.primary,
+    backgroundColor: Palette.primaryDark,
+  },
+  intervalChipText: {
+    fontSize: 13,
+    color: Palette.textMuted,
+  },
+  intervalChipTextActive: {
+    color: Palette.primaryLight,
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  pressed: {
+    opacity: 0.8,
   },
 });

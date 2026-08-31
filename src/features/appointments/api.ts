@@ -8,6 +8,9 @@ import {
 
 export type { Appointment, AvailableSlotsResponse, Business, Service };
 
+/**
+ * Consulta la información del negocio y sus servicios asociados.
+ */
 export async function fetchBusiness(): Promise<{
   business: Business;
   services: Service[];
@@ -19,12 +22,18 @@ export async function fetchBusiness(): Promise<{
   return JSON.parse(text);
 }
 
+/**
+ * Consulta la lista de citas agendadas para una fecha específica.
+ */
 export async function listAppointments(date: string): Promise<Appointment[]> {
   const res = await fetch(`${API_BASE_URL}/appointments?date=${date}`);
   if (!res.ok) throw new Error("No se pudo cargar la agenda");
   return res.json();
 }
 
+/**
+ * Obtiene los horarios libres disponibles para un servicio y fecha.
+ */
 export async function getAvailableSlots(
   date: string,
   serviceId: string,
@@ -37,6 +46,9 @@ export async function getAvailableSlots(
   return res.json();
 }
 
+/**
+ * Crea manualmente una cita desde la aplicación.
+ */
 export async function createAppointment(data: {
   customer_id: string;
   service_id: string;
@@ -56,6 +68,9 @@ export async function createAppointment(data: {
   return res.json();
 }
 
+/**
+ * Cancela una reserva existente.
+ */
 export async function cancelAppointment(id: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/appointments/${id}/cancel`, {
     method: "PATCH",
@@ -63,27 +78,32 @@ export async function cancelAppointment(id: string): Promise<void> {
   if (!res.ok) throw new Error("No se pudo cancelar la reserva");
 }
 
+/**
+ * Marca una reserva como completada.
+ */
 export async function completeAppointment(id: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/appointments/${id}/complete`, {
     method: "PATCH",
   });
   if (!res.ok) {
-    // Si no existe la ruta /complete, intentar actualizar con PATCH general
     const fallback = await fetch(`${API_BASE_URL}/appointments/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "COMPLETED" }),
     });
     if (!fallback.ok) {
-      // Si el backend no tiene endpoint de status, no bloquear la UI
       console.warn("Backend no implementa /complete o PATCH /appointments/:id");
     }
   }
 }
 
+/**
+ * Actualiza la configuración operativa del negocio (intervalos, modo de reserva y recordatorios).
+ */
 export async function updateBusinessSettings(data: {
   slot_step_minutes?: number;
   booking_mode?: "auto" | "approval";
+  notify_upcoming_appointments?: number | boolean;
 }): Promise<Business> {
   const res = await fetch(`${API_BASE_URL}/appointments/business/settings`, {
     method: "PATCH",
@@ -94,6 +114,9 @@ export async function updateBusinessSettings(data: {
   return res.json();
 }
 
+/**
+ * Actualiza los datos de perfil del negocio (nombre, teléfono, dirección y logo).
+ */
 export async function updateBusiness(data: {
   name?: string;
   phone?: string;
@@ -109,6 +132,9 @@ export async function updateBusiness(data: {
   return res.json();
 }
 
+/**
+ * Acepta o rechaza una solicitud de cita en modo aprobación.
+ */
 export async function respondAppointment(
   id: string,
   decision: "accept" | "reject",

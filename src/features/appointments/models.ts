@@ -3,6 +3,9 @@ import { Service } from "@/features/services/models";
 
 export type { Service };
 
+/**
+ * Modelo de datos del negocio (Barbería).
+ */
 export type Business = {
   id: string;
   name: string;
@@ -12,8 +15,15 @@ export type Business = {
   timezone: string;
   slot_step_minutes: number;
   logo_base64: string | null;
+  /**
+   * Indica si está activa la notificación de alerta 5 minutos antes de cada turno.
+   */
+  notify_upcoming_appointments?: number | boolean;
 };
 
+/**
+ * Modelo de una cita / reserva.
+ */
 export type Appointment = {
   id: string;
   date: string;
